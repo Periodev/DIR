@@ -1,7 +1,7 @@
 extends Node2D
 
-const COLS := 4
-const ROWS := 4
+const COLS := 5
+const ROWS := 5
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
 const CELL_STEP := CELL_SIZE + CELL_GAP
@@ -10,7 +10,7 @@ signal game_over_signal(final_score: int)
 signal board_updated
 
 var grid: Array = []  # grid[row][col] = CellType
-var player_pos: Vector2i = Vector2i(1, 1)
+var player_pos: Vector2i = Vector2i(COLS / 2, ROWS / 2)
 var candidate_cells: Array = []  # Array of Vector2i
 var cycle_counter: int = 0
 var freeze_steps: int = 0
@@ -64,7 +64,7 @@ func restart() -> void:
 			row.append(CharacterData.CellType.LIVE)
 		grid.append(row)
 
-	player_pos = Vector2i(1, 1)
+	player_pos = Vector2i(COLS / 2, ROWS / 2)
 	candidate_cells.clear()
 	cycle_counter = 0
 	cycle_resolved = false
