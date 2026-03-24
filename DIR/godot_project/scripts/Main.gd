@@ -1,13 +1,15 @@
 extends Node
 
+const CURRENT_CHARACTER := "EXE"
+const ATTACK_MODE_USE_CHARACTER := -1
+const CURRENT_ATTACK_MODE := CharacterData.AttackMode.STRIKE
+
 @onready var board: Node2D = $Board
 @onready var hud: CanvasLayer = $HUD
 
-var current_character: String = "COR"
-
 func _ready() -> void:
-	board.setup_character(current_character)
-	hud.setup(current_character)
+	board.setup_character(CURRENT_CHARACTER, CURRENT_ATTACK_MODE)
+	hud.setup(CURRENT_CHARACTER)
 
 	board.game_over_signal.connect(_on_game_over)
 	board.board_updated.connect(_on_board_updated)
@@ -25,7 +27,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Restart
 	if keycode == KEY_R:
 		board.restart()
-		hud.setup(current_character)
+		hud.setup(CURRENT_CHARACTER)
 		_on_board_updated()
 		get_viewport().set_input_as_handled()
 		return

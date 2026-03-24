@@ -19,6 +19,7 @@ var inventory: Inventory
 var score_manager: ScoreManager
 var game_state: GameStateMachine
 var current_character: String = "COR"
+var current_attack_mode_override: int = -1
 
 var cell_nodes: Array = []  # cell_nodes[row][col] = Cell node
 var player_node: Node2D
@@ -50,8 +51,9 @@ func _ready() -> void:
 
 	restart()
 
-func setup_character(char_name: String) -> void:
+func setup_character(char_name: String, attack_mode_override: int = -1) -> void:
 	current_character = char_name
+	current_attack_mode_override = attack_mode_override
 	inventory.setup(char_name)
 	player_node.set_character(char_name)
 
@@ -70,7 +72,7 @@ func restart() -> void:
 	cycle_resolved = false
 	freeze_steps = 0
 
-	setup_character(current_character)
+	setup_character(current_character, current_attack_mode_override)
 	score_manager.reset()
 	game_state.reset()
 
@@ -110,7 +112,8 @@ func try_move(dir: int) -> bool:
 
 		# Remove matched direction (first occurrence)
 		inventory.remove_at(match_idx)
-		player_pos = target
+		if _get_attack_mode() == CharacterData.AttackMode.RAM:
+			player_pos = target
 
 		# Kill flow
 		_kill_flow(target, target_type)
@@ -121,6 +124,12 @@ func try_move(dir: int) -> bool:
 		_refresh_visuals()
 		_check_game_over()
 		return true
+
+func _get_attack_mode() -> int:
+	if current_attack_mode_override >= 0:
+		return current_attack_mode_override
+	var data = CharacterData.CHARACTERS[current_character]
+	return data.get("attack_mode", CharacterData.AttackMode.RAM)
 
 func try_ultimate() -> bool:
 	if not game_state.is_idle():
