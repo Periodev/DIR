@@ -115,8 +115,8 @@ func try_move(dir: int) -> bool:
 		if _get_attack_mode() == CharacterData.AttackMode.RAM:
 			player_pos = target
 
-		# Kill flow
-		_kill_flow(target, target_type)
+		# Attack flow
+		_resolve_attack(dir, target, target_type)
 
 		# Advance cycle
 		game_state.set_state(CharacterData.GameStateEnum.GENERATING)
@@ -130,6 +130,30 @@ func _get_attack_mode() -> int:
 		return current_attack_mode_override
 	var data = CharacterData.CHARACTERS[current_character]
 	return data.get("attack_mode", CharacterData.AttackMode.RAM)
+
+func _has_pierce_passive() -> bool:
+	var data = CharacterData.CHARACTERS[current_character]
+	if not data.get("has_pierce", false):
+		return false
+	return _get_attack_mode() != CharacterData.AttackMode.RAM
+
+func _resolve_attack(dir: int, target: Vector2i, target_type: int) -> void:
+	_kill_flow(target, target_type)
+
+	if not _has_pierce_passive():
+		return
+	if grid[target.y][target.x] != CharacterData.CellType.LIVE:
+		return
+
+	var next_pos = target + CharacterData.DIR_VECTOR[dir]
+	if next_pos.x < 0 or next_pos.x >= COLS or next_pos.y < 0 or next_pos.y >= ROWS:
+		return
+
+	var next_type = grid[next_pos.y][next_pos.x]
+	if next_type == CharacterData.CellType.LIVE:
+		return
+
+	_kill_flow(next_pos, next_type)
 
 func try_ultimate() -> bool:
 	if not game_state.is_idle():
