@@ -3,6 +3,7 @@ extends CanvasLayer
 var score_label: Label
 var combo_label: Label
 var inventory_container: HBoxContainer
+var inventory_panel: PanelContainer
 var hold_container: HBoxContainer
 var hold_label: Label
 var hold_slot: Label
@@ -37,14 +38,14 @@ func _ready() -> void:
 	add_child(combo_label)
 
 	# Inventory container - bottom
-	var inv_bg = PanelContainer.new()
-	inv_bg.position = Vector2(20, 700)
-	inv_bg.size = Vector2(760, 60)
-	add_child(inv_bg)
+	inventory_panel = PanelContainer.new()
+	inventory_panel.position = Vector2(20, 700)
+	inventory_panel.size = Vector2(760, 60)
+	add_child(inventory_panel)
 
 	var inv_hbox = HBoxContainer.new()
 	inv_hbox.add_theme_constant_override("separation", 8)
-	inv_bg.add_child(inv_hbox)
+	inventory_panel.add_child(inv_hbox)
 
 	var q_label = Label.new()
 	q_label.text = "SEQ "
@@ -118,6 +119,9 @@ func _ready() -> void:
 	restart_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(restart_hint)
 
+	get_viewport().size_changed.connect(_layout_ui)
+	_layout_ui()
+
 func setup(char_name: String) -> void:
 	var data = CharacterData.CHARACTERS[char_name]
 	_max_slots = data["seq"]
@@ -186,3 +190,28 @@ func show_game_over(final_score: int) -> void:
 
 func hide_game_over() -> void:
 	gameover_panel.visible = false
+
+func _layout_ui() -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	score_label.position = Vector2(viewport_size.x - 200, 10)
+	score_label.size = Vector2(180, 50)
+
+	combo_label.position = Vector2(viewport_size.x - 200, 55)
+	combo_label.size = Vector2(180, 30)
+
+	freeze_label.position = Vector2(20, 10)
+	freeze_label.size = Vector2(200, 30)
+
+	var inventory_width: float = min(viewport_size.x - 40.0, 960.0)
+	var inventory_x: float = (viewport_size.x - inventory_width) * 0.5
+	var inventory_y: float = viewport_size.y - 100.0
+	inventory_panel.position = Vector2(inventory_x, inventory_y)
+	inventory_panel.size = Vector2(inventory_width, 60)
+
+	message_label.position = Vector2(0, viewport_size.y - 30.0)
+	message_label.size = Vector2(viewport_size.x, 30)
+
+	gameover_panel.position = Vector2(
+		(viewport_size.x - gameover_panel.size.x) * 0.5,
+		(viewport_size.y - gameover_panel.size.y) * 0.5
+	)

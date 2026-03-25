@@ -1,9 +1,11 @@
 extends Node2D
 
-const COLS := 7
-const ROWS := 3
+const COLS := 5
+const ROWS := 5
 const SPAWN_CYCLE_STEPS := 3
 const SPAWNS_PER_CYCLE := 2
+const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD
+const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
 const CELL_STEP := CELL_SIZE + CELL_GAP
@@ -12,7 +14,9 @@ signal game_over_signal(final_score: int)
 signal board_updated
 
 var grid: Array = []  # grid[row][col] = CellType
+var cell_shield_dirs: Array = []  # cell_shield_dirs[row][col] = Direction
 var player_pos: Vector2i = Vector2i(COLS / 2, ROWS / 2)
+var player_facing_dir: int = CharacterData.Direction.UP
 var candidate_cells: Array = []  # Array of Vector2i
 var bonus_move_options: Dictionary = {}  # Direction -> Vector2i
 var bonus_move_can_stay: bool = false
@@ -53,6 +57,8 @@ func _ready() -> void:
 	player_node = player_scene.instantiate()
 	add_child(player_node)
 
+	get_viewport().size_changed.connect(_update_board_offset)
+	_update_board_offset()
 	restart()
 
 func setup_character(char_name: String, attack_mode_override: int = -1) -> void:
@@ -64,13 +70,18 @@ func setup_character(char_name: String, attack_mode_override: int = -1) -> void:
 func restart() -> void:
 	# Reset grid
 	grid.clear()
+	cell_shield_dirs.clear()
 	for r in ROWS:
 		var row := []
+		var shield_row := []
 		for c in COLS:
 			row.append(CharacterData.CellType.LIVE)
+			shield_row.append(CharacterData.Direction.NONE)
 		grid.append(row)
+		cell_shield_dirs.append(shield_row)
 
 	player_pos = Vector2i(COLS / 2, ROWS / 2)
+	player_facing_dir = CharacterData.Direction.UP
 	candidate_cells.clear()
 	bonus_move_options.clear()
 	bonus_move_can_stay = false
@@ -99,6 +110,7 @@ func try_move(dir: int) -> bool:
 
 	if target_type == CharacterData.CellType.LIVE:
 		# Move to live cell
+		player_facing_dir = dir
 		player_pos = target
 		inventory.push(dir)
 		inventory.register_move(dir)
@@ -116,6 +128,9 @@ func try_move(dir: int) -> bool:
 
 		# Remove matched direction (first occurrence)
 		inventory.remove_at(match_idx)
+		player_facing_dir = dir
+		if _try_break_one_way_shield(target, dir, target_type):
+			return _finalize_turn_after_action()
 		if _has_penetrating_attack():
 			_resolve_penetrating_attack(dir, origin, target, target_type)
 		elif _get_attack_mode() == CharacterData.AttackMode.RAM:
@@ -149,11 +164,14 @@ func try_charge_action() -> bool:
 	if not inventory.consume_charge():
 		return false
 
+	player_facing_dir = dir
 	var target_type = grid[target.y][target.x]
 	if target_type == CharacterData.CellType.LIVE:
 		player_pos = target
 		score_manager.on_move_to_live()
 	else:
+		if _try_break_one_way_shield(target, dir, target_type):
+			return _finalize_turn_after_action()
 		if _get_attack_mode() == CharacterData.AttackMode.RAM:
 			player_pos = target
 		_resolve_attack(dir, target, target_type)
@@ -171,6 +189,7 @@ func try_bonus_move(dir: int) -> bool:
 	if not bonus_move_options.has(dir):
 		return false
 
+	player_facing_dir = dir
 	player_pos = bonus_move_options[dir]
 	bonus_move_options.clear()
 	bonus_move_can_stay = false
@@ -206,8 +225,28 @@ func _has_post_kill_reposition() -> bool:
 	var data = CharacterData.CHARACTERS[current_character]
 	return data.get("has_post_kill_reposition", false)
 
+func _try_break_one_way_shield(target: Vector2i, attack_dir: int, target_type: int) -> bool:
+	if target_type != CharacterData.CellType.DEAD_ONE_WAY_SHIELD:
+		return false
+	if cell_shield_dirs[target.y][target.x] != CharacterData.OPPOSITE[attack_dir]:
+		return false
+
+	grid[target.y][target.x] = CharacterData.CellType.DEAD
+	cell_shield_dirs[target.y][target.x] = CharacterData.Direction.NONE
+	score_manager.combo_counter += 1
+	score_manager.on_kill(target_type)
+	return true
+
+func _get_shield_dir_toward_player(pos: Vector2i) -> int:
+	var delta: Vector2i = player_pos - pos
+	if delta == Vector2i.ZERO:
+		return CharacterData.OPPOSITE[player_facing_dir]
+	if abs(delta.x) >= abs(delta.y):
+		return CharacterData.Direction.RIGHT if delta.x > 0 else CharacterData.Direction.LEFT
+	return CharacterData.Direction.DOWN if delta.y > 0 else CharacterData.Direction.UP
+
 func _resolve_attack(dir: int, target: Vector2i, target_type: int) -> void:
-	_kill_flow(target, target_type)
+	_kill_flow(target, dir, target_type)
 
 	if not _has_pierce_passive():
 		return
@@ -222,10 +261,10 @@ func _resolve_attack(dir: int, target: Vector2i, target_type: int) -> void:
 	if next_type == CharacterData.CellType.LIVE:
 		return
 
-	_kill_flow(next_pos, next_type)
+	_kill_flow(next_pos, dir, next_type)
 
 func _resolve_penetrating_attack(dir: int, origin: Vector2i, target: Vector2i, target_type: int) -> void:
-	_kill_flow(target, target_type)
+	_kill_flow(target, dir, target_type)
 
 	# Fall back to RAM behavior when tunneling is not possible.
 	if grid[target.y][target.x] != CharacterData.CellType.LIVE:
@@ -285,16 +324,26 @@ func try_ultimate() -> bool:
 	_refresh_visuals()
 	return true
 
-func _kill_flow(pos: Vector2i, cell_type: int) -> void:
+func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
+	if cell_type == CharacterData.CellType.DEAD_ONE_WAY_SHIELD:
+		if cell_shield_dirs[pos.y][pos.x] == CharacterData.OPPOSITE[attack_dir]:
+			grid[pos.y][pos.x] = CharacterData.CellType.DEAD
+			cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
+			score_manager.combo_counter += 1
+			score_manager.on_kill(cell_type)
+			return
+
 	if cell_type == CharacterData.CellType.DEAD_SHIELD:
 		# First hit: become regular DEAD, still score
 		grid[pos.y][pos.x] = CharacterData.CellType.DEAD
+		cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
 		score_manager.combo_counter += 1
 		score_manager.on_kill(cell_type)
 		return
 
 	# Set to LIVE
 	grid[pos.y][pos.x] = CharacterData.CellType.LIVE
+	cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
 	score_manager.combo_counter += 1
 	score_manager.on_kill(cell_type)
 
@@ -307,6 +356,7 @@ func _kill_flow(pos: Vector2i, cell_type: int) -> void:
 			var n_type = grid[neighbor.y][neighbor.x]
 			if n_type != CharacterData.CellType.LIVE:
 				grid[neighbor.y][neighbor.x] = CharacterData.CellType.LIVE
+				cell_shield_dirs[neighbor.y][neighbor.x] = CharacterData.Direction.NONE
 				score_manager.combo_counter += 1
 				score_manager.on_kill(n_type)
 
@@ -345,7 +395,7 @@ func _start_new_cycle() -> void:
 	for r in ROWS:
 		for c in COLS:
 			var pos = Vector2i(c, r)
-			if grid[r][c] == CharacterData.CellType.LIVE:
+			if _is_spawnable_live_cell(pos):
 				available.append(pos)
 	available.shuffle()
 	var count = min(SPAWNS_PER_CYCLE, available.size())
@@ -366,24 +416,31 @@ func _apply_candidate_spawn(pos: Vector2i) -> void:
 	if pos == player_pos:
 		var first := inventory.pop()
 		if first == CharacterData.Direction.NONE:
-			grid[pos.y][pos.x] = _pick_dead_type()
+			_spawn_dead(pos)
 			return
 		var second := inventory.pop()
 		if second != CharacterData.Direction.NONE:
 			return
 
-	grid[pos.y][pos.x] = _pick_dead_type()
+	_spawn_dead(pos)
+
+func _spawn_dead(pos: Vector2i) -> void:
+	var cell_type := _pick_dead_type()
+	grid[pos.y][pos.x] = cell_type
+	if cell_type == CharacterData.CellType.DEAD_ONE_WAY_SHIELD:
+		cell_shield_dirs[pos.y][pos.x] = _get_shield_dir_toward_player(pos)
+	else:
+		cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
 
 func _pick_dead_type() -> int:
-	if not CharacterData.ENABLE_VARIANTS:
-		return CharacterData.CellType.DEAD
-	var roll = randf()
-	if roll < 0.75:
-		return CharacterData.CellType.DEAD
-	elif roll < 0.90:
-		return CharacterData.CellType.DEAD_SHIELD
-	else:
-		return CharacterData.CellType.DEAD_DOUBLE
+	return SPAWN_CELL_TYPE
+
+func _is_spawnable_live_cell(pos: Vector2i) -> bool:
+	if grid[pos.y][pos.x] != CharacterData.CellType.LIVE:
+		return false
+	if not BLOCK_OUTER_RING_SPAWN:
+		return true
+	return pos.x > 0 and pos.x < COLS - 1 and pos.y > 0 and pos.y < ROWS - 1
 
 func _check_game_over() -> void:
 	if grid[player_pos.y][player_pos.x] != CharacterData.CellType.LIVE:
@@ -419,13 +476,16 @@ func _refresh_visuals() -> void:
 		for c in COLS:
 			var cell = cell_nodes[r][c]
 			cell.set_type(grid[r][c])
+			cell.set_shield_dir(cell_shield_dirs[r][c])
 			cell.set_candidate(0)
 
 	# Mark candidates
-	for i in candidate_cells.size():
-		var pos = candidate_cells[i]
-		var phase = 1 if cycle_counter <= 1 else 2
-		cell_nodes[pos.y][pos.x].set_candidate(phase)
+	var preview_start: int = max(1, SPAWN_CYCLE_STEPS - 2)
+	if cycle_counter >= preview_start:
+		for i in candidate_cells.size():
+			var pos: Vector2i = candidate_cells[i]
+			var phase: int = 1 if cycle_counter == preview_start else 2
+			cell_nodes[pos.y][pos.x].set_candidate(phase)
 
 	for pos in bonus_move_options.values():
 		cell_nodes[pos.y][pos.x].set_candidate(3)
@@ -439,3 +499,12 @@ func _refresh_visuals() -> void:
 	)
 
 	board_updated.emit()
+
+func _update_board_offset() -> void:
+	var board_width: float = float(COLS - 1) * CELL_STEP + CELL_SIZE
+	var board_height: float = float(ROWS - 1) * CELL_STEP + CELL_SIZE
+	var viewport_size: Vector2 = get_viewport_rect().size
+	position = Vector2(
+		(viewport_size.x - board_width) * 0.5,
+		(viewport_size.y - board_height) * 0.5
+	)

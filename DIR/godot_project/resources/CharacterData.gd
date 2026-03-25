@@ -2,7 +2,7 @@ class_name CharacterData
 
 enum Direction { NONE = 0, UP = 1, DOWN = 2, LEFT = 3, RIGHT = 4 }
 
-enum CellType { LIVE, DEAD, DEAD_SHIELD, DEAD_DOUBLE }
+enum CellType { LIVE, DEAD, DEAD_SHIELD, DEAD_DOUBLE, DEAD_ONE_WAY_SHIELD }
 
 enum AttackMode { RAM, STRIKE }
 
@@ -45,7 +45,7 @@ const CHARACTERS := {
 		"shape":     "pentagon",
 	},
 	"COR": {
-		"seq":       3,
+		"seq":       4,
 		"has_hold":  false,
 		"has_charge_marker": true,
 		"charge_max": 5,
@@ -58,7 +58,7 @@ const CHARACTERS := {
 		"shape":     "hexagon",
 	},
 	"PLN": {
-		"seq":       4,
+		"seq":       3,
 		"has_hold":  false,
 		"has_charge_marker": false,
 		"charge_max": 0,
