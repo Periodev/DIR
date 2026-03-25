@@ -1,8 +1,8 @@
 extends Node
 
-const CURRENT_CHARACTER := "EXE"
+const CURRENT_CHARACTER := "PLN"
 const ATTACK_MODE_USE_CHARACTER := -1
-const CURRENT_ATTACK_MODE := CharacterData.AttackMode.STRIKE
+const CURRENT_ATTACK_MODE := CharacterData.AttackMode.RAM
 
 @onready var board: Node2D = $Board
 @onready var hud: CanvasLayer = $HUD
@@ -38,13 +38,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Movement
 	var dir = CharacterData.key_to_direction(keycode)
 	if dir != CharacterData.Direction.NONE:
-		board.try_move(dir)
+		if board.game_state.is_bonus_move_select():
+			board.try_bonus_move(dir)
+		else:
+			board.try_move(dir)
 		get_viewport().set_input_as_handled()
 		return
 
 	# Hold (Space)
 	if keycode == KEY_SPACE:
-		board.inventory.toggle_hold()
+		if board.game_state.is_bonus_move_select():
+			board.try_bonus_stay()
+		elif board.inventory.has_charge_marker:
+			board.try_charge_action()
+		else:
+			board.inventory.toggle_hold()
+		_on_board_updated()
+		get_viewport().set_input_as_handled()
+		return
+
+	# Wait (X)
+	if keycode == KEY_X:
+		board.try_wait()
 		_on_board_updated()
 		get_viewport().set_input_as_handled()
 		return

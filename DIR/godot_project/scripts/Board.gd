@@ -1,7 +1,9 @@
 extends Node2D
 
-const COLS := 5
-const ROWS := 5
+const COLS := 7
+const ROWS := 3
+const SPAWN_CYCLE_STEPS := 3
+const SPAWNS_PER_CYCLE := 2
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
 const CELL_STEP := CELL_SIZE + CELL_GAP
@@ -12,6 +14,8 @@ signal board_updated
 var grid: Array = []  # grid[row][col] = CellType
 var player_pos: Vector2i = Vector2i(COLS / 2, ROWS / 2)
 var candidate_cells: Array = []  # Array of Vector2i
+var bonus_move_options: Dictionary = {}  # Direction -> Vector2i
+var bonus_move_can_stay: bool = false
 var cycle_counter: int = 0
 var freeze_steps: int = 0
 
@@ -68,6 +72,8 @@ func restart() -> void:
 
 	player_pos = Vector2i(COLS / 2, ROWS / 2)
 	candidate_cells.clear()
+	bonus_move_options.clear()
+	bonus_move_can_stay = false
 	cycle_counter = 0
 	cycle_resolved = false
 	freeze_steps = 0
@@ -95,14 +101,10 @@ func try_move(dir: int) -> bool:
 		# Move to live cell
 		player_pos = target
 		inventory.push(dir)
+		inventory.register_move(dir)
 		score_manager.on_move_to_live()
 
-		# Advance cycle
-		game_state.set_state(CharacterData.GameStateEnum.GENERATING)
-		_advance_cycle()
-		_refresh_visuals()
-		_check_game_over()
-		return true
+		return _finalize_turn_after_action()
 
 	else:
 		# Dead cell - check inventory for matching direction (any position)
@@ -110,20 +112,79 @@ func try_move(dir: int) -> bool:
 		if match_idx < 0:
 			return false  # No matching direction in queue
 
+		var origin := player_pos
+
 		# Remove matched direction (first occurrence)
 		inventory.remove_at(match_idx)
+		if _has_penetrating_attack():
+			_resolve_penetrating_attack(dir, origin, target, target_type)
+		elif _get_attack_mode() == CharacterData.AttackMode.RAM:
+			player_pos = target
+			inventory.register_move(dir)
+			_resolve_attack(dir, target, target_type)
+		else:
+			_resolve_attack(dir, target, target_type)
+
+		if _begin_post_kill_reposition_if_needed(target, dir):
+			_refresh_visuals()
+			return true
+		return _finalize_turn_after_action()
+
+func try_charge_action() -> bool:
+	if not game_state.is_idle():
+		return false
+	if not inventory.has_charge_marker:
+		return false
+	if not inventory.is_charge_full():
+		return false
+	if inventory.charge_direction == CharacterData.Direction.NONE:
+		return false
+
+	var dir := inventory.charge_direction
+	var dv = CharacterData.DIR_VECTOR[dir]
+	var target = player_pos + dv
+	if target.x < 0 or target.x >= COLS or target.y < 0 or target.y >= ROWS:
+		return false
+
+	if not inventory.consume_charge():
+		return false
+
+	var target_type = grid[target.y][target.x]
+	if target_type == CharacterData.CellType.LIVE:
+		player_pos = target
+		score_manager.on_move_to_live()
+	else:
 		if _get_attack_mode() == CharacterData.AttackMode.RAM:
 			player_pos = target
-
-		# Attack flow
 		_resolve_attack(dir, target, target_type)
 
-		# Advance cycle
-		game_state.set_state(CharacterData.GameStateEnum.GENERATING)
-		_advance_cycle()
-		_refresh_visuals()
-		_check_game_over()
-		return true
+	return _finalize_turn_after_action()
+
+func try_wait() -> bool:
+	if not game_state.is_idle():
+		return false
+	return _finalize_turn_after_action()
+
+func try_bonus_move(dir: int) -> bool:
+	if not game_state.is_bonus_move_select():
+		return false
+	if not bonus_move_options.has(dir):
+		return false
+
+	player_pos = bonus_move_options[dir]
+	bonus_move_options.clear()
+	bonus_move_can_stay = false
+	return _finalize_turn_after_action()
+
+func try_bonus_stay() -> bool:
+	if not game_state.is_bonus_move_select():
+		return false
+	if not bonus_move_can_stay:
+		return false
+
+	bonus_move_options.clear()
+	bonus_move_can_stay = false
+	return _finalize_turn_after_action()
 
 func _get_attack_mode() -> int:
 	if current_attack_mode_override >= 0:
@@ -136,6 +197,14 @@ func _has_pierce_passive() -> bool:
 	if not data.get("has_pierce", false):
 		return false
 	return _get_attack_mode() != CharacterData.AttackMode.RAM
+
+func _has_penetrating_attack() -> bool:
+	var data = CharacterData.CHARACTERS[current_character]
+	return data.get("has_penetrating_attack", false)
+
+func _has_post_kill_reposition() -> bool:
+	var data = CharacterData.CHARACTERS[current_character]
+	return data.get("has_post_kill_reposition", false)
 
 func _resolve_attack(dir: int, target: Vector2i, target_type: int) -> void:
 	_kill_flow(target, target_type)
@@ -154,6 +223,53 @@ func _resolve_attack(dir: int, target: Vector2i, target_type: int) -> void:
 		return
 
 	_kill_flow(next_pos, next_type)
+
+func _resolve_penetrating_attack(dir: int, origin: Vector2i, target: Vector2i, target_type: int) -> void:
+	_kill_flow(target, target_type)
+
+	# Fall back to RAM behavior when tunneling is not possible.
+	if grid[target.y][target.x] != CharacterData.CellType.LIVE:
+		player_pos = target
+		return
+
+	var behind = target + CharacterData.DIR_VECTOR[dir]
+	if behind.x < 0 or behind.x >= COLS or behind.y < 0 or behind.y >= ROWS:
+		player_pos = target
+		return
+	if grid[behind.y][behind.x] != CharacterData.CellType.LIVE:
+		player_pos = target
+		return
+
+	player_pos = behind
+
+func _begin_post_kill_reposition_if_needed(target: Vector2i, entry_dir: int) -> bool:
+	if not _has_post_kill_reposition():
+		return false
+	if grid[target.y][target.x] != CharacterData.CellType.LIVE:
+		return false
+
+	bonus_move_options.clear()
+	bonus_move_can_stay = true
+	for dir in CharacterData.DIR_VECTOR:
+		var pos = player_pos + CharacterData.DIR_VECTOR[dir]
+		if pos.x < 0 or pos.x >= COLS or pos.y < 0 or pos.y >= ROWS:
+			continue
+		if grid[pos.y][pos.x] != CharacterData.CellType.LIVE:
+			continue
+		bonus_move_options[dir] = pos
+
+	if bonus_move_options.is_empty() and not bonus_move_can_stay:
+		return false
+
+	game_state.set_state(CharacterData.GameStateEnum.BONUS_MOVE_SELECT)
+	return true
+
+func _finalize_turn_after_action() -> bool:
+	game_state.set_state(CharacterData.GameStateEnum.GENERATING)
+	_advance_cycle()
+	_refresh_visuals()
+	_check_game_over()
+	return true
 
 func try_ultimate() -> bool:
 	if not game_state.is_idle():
@@ -208,16 +324,13 @@ func _advance_cycle() -> void:
 
 	if cycle_resolved:
 		# Already spawned this cycle, idle until cycle ends
-		if cycle_counter >= 3:
+		if cycle_counter >= SPAWN_CYCLE_STEPS:
 			cycle_counter = 0
 			cycle_resolved = false
 	elif cycle_counter == 1:
 		_start_new_cycle()
-	elif cycle_counter == 2:
+	elif cycle_counter >= SPAWN_CYCLE_STEPS:
 		_clean_candidates()
-		for pos in candidate_cells:
-			cell_nodes[pos.y][pos.x].set_candidate(2)
-	elif cycle_counter >= 3:
 		for pos in candidate_cells:
 			_apply_candidate_spawn(pos)
 		candidate_cells.clear()
@@ -235,7 +348,7 @@ func _start_new_cycle() -> void:
 			if grid[r][c] == CharacterData.CellType.LIVE:
 				available.append(pos)
 	available.shuffle()
-	var count = min(2, available.size())
+	var count = min(SPAWNS_PER_CYCLE, available.size())
 	for i in count:
 		candidate_cells.append(available[i])
 
@@ -313,6 +426,11 @@ func _refresh_visuals() -> void:
 		var pos = candidate_cells[i]
 		var phase = 1 if cycle_counter <= 1 else 2
 		cell_nodes[pos.y][pos.x].set_candidate(phase)
+
+	for pos in bonus_move_options.values():
+		cell_nodes[pos.y][pos.x].set_candidate(3)
+	if bonus_move_can_stay:
+		cell_nodes[player_pos.y][player_pos.x].set_candidate(3)
 
 	# Update player position
 	player_node.position = Vector2(

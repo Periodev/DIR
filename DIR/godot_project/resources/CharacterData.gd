@@ -6,7 +6,7 @@ enum CellType { LIVE, DEAD, DEAD_SHIELD, DEAD_DOUBLE }
 
 enum AttackMode { RAM, STRIKE }
 
-enum GameStateEnum { IDLE, GENERATING, GAME_OVER }
+enum GameStateEnum { IDLE, GENERATING, BONUS_MOVE_SELECT, GAME_OVER }
 
 const DIR_VECTOR := {
 	Direction.UP:    Vector2i( 0, -1),
@@ -34,27 +34,39 @@ const CHARACTERS := {
 	"EXE": {
 		"seq":       2,
 		"has_hold":  false,
+		"has_charge_marker": false,
+		"charge_max": 0,
 		"has_ult":   false,
 		"attack_mode": AttackMode.RAM,
 		"has_pierce": true,
+		"has_penetrating_attack": false,
+		"has_post_kill_reposition": false,
 		"color":     Color(0.9, 0.2, 0.2),
 		"shape":     "pentagon",
 	},
 	"COR": {
 		"seq":       3,
-		"has_hold":  true,
+		"has_hold":  false,
+		"has_charge_marker": true,
+		"charge_max": 5,
 		"has_ult":   false,
 		"attack_mode": AttackMode.RAM,
 		"has_pierce": false,
+		"has_penetrating_attack": false,
+		"has_post_kill_reposition": false,
 		"color":     Color(0.2, 0.4, 0.9),
 		"shape":     "hexagon",
 	},
 	"PLN": {
-		"seq":       5,
+		"seq":       4,
 		"has_hold":  false,
+		"has_charge_marker": false,
+		"charge_max": 0,
 		"has_ult":   true,
 		"attack_mode": AttackMode.RAM,
 		"has_pierce": false,
+		"has_penetrating_attack": false,
+		"has_post_kill_reposition": true,
 		"color":     Color(0.2, 0.8, 0.3),
 		"shape":     "blade_diamond",
 	},
