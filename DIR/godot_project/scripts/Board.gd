@@ -181,6 +181,7 @@ func try_charge_action() -> bool:
 func try_wait() -> bool:
 	if not game_state.is_idle():
 		return false
+	inventory.push(CharacterData.Direction.NEUTRAL)
 	return _finalize_turn_after_action()
 
 func try_bonus_move(dir: int) -> bool:

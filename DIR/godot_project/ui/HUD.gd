@@ -82,7 +82,7 @@ func _ready() -> void:
 	add_child(freeze_label)
 
 	message_label = Label.new()
-	message_label.text = "WASD: Move | Space: Hold | R: Restart"
+	message_label.text = "WASD: Move | Space: Hold | X: Wait | R: Restart"
 	message_label.add_theme_font_size_override("font_size", 14)
 	message_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	message_label.position = Vector2(0, 770)
