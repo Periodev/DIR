@@ -2,9 +2,9 @@ extends Node2D
 
 const COLS := 5
 const ROWS := 5
-const SPAWN_CYCLE_STEPS := 3
+const SPAWN_CYCLE_STEPS := 4
 const SPAWNS_PER_CYCLE := 2
-const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD
+const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD_ONE_WAY_SHIELD
 const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
