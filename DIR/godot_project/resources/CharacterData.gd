@@ -71,6 +71,21 @@ const CHARACTERS := {
 		"color":     Color(0.2, 0.8, 0.3),
 		"shape":     "blade_diamond",
 	},
+	"GRD": {
+		"seq":       6,
+		"has_hold":  false,
+		"has_charge_marker": false,
+		"charge_max": 0,
+		"has_ult":   false,
+		"attack_mode": AttackMode.RAM,
+		"has_pierce": false,
+		"has_penetrating_attack": false,
+		"has_post_kill_reposition": false,
+		"has_post_defense_step": true,
+		"moves_generate_neutral_only": true,
+		"color":     Color(0.55, 0.65, 0.8),
+		"shape":     "square",
+	},
 }
 
 const ENABLE_VARIANTS := false
