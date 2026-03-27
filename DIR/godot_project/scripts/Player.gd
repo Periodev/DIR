@@ -14,6 +14,17 @@ func set_character(char_name: String) -> void:
 func _draw() -> void:
 	var points: PackedVector2Array
 	match character_shape:
+		"circle":
+			draw_circle(Vector2.ZERO, 22.0, character_color)
+			draw_arc(Vector2.ZERO, 22.0, 0.0, TAU, 32, Color.WHITE, 2.0)
+			return
+		"diamond":
+			points = PackedVector2Array([
+				Vector2(0, -22),
+				Vector2(22, 0),
+				Vector2(0, 22),
+				Vector2(-22, 0),
+			])
 		"pentagon":
 			points = _make_polygon(5, 20.0, -PI / 2.0)
 		"hexagon":
@@ -41,9 +52,35 @@ func _draw() -> void:
 func play_move(from_pos: Vector2) -> void:
 	var to_pos := position          # already set by Board
 	position = from_pos             # snap back to start
-	var tw := create_tween()
-	tw.tween_property(self, "position", to_pos, 0.12)\
-	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	match character_name:
+		"EXE":
+			# [1] Anticipation 0.05s — coil: compress scale, hold position
+			# [2] Lock         0.02s — freeze before release
+			# [3] Dash         0.08s — EASE_IN burst, no deform, heavy object launched
+			# [4] Hard stop    0.02s — single minimal settle, nearly no bounce
+			var dir := (to_pos - from_pos).normalized()
+			var tw := create_tween()
+			tw.tween_interval(0.07)
+			tw.tween_property(self, "position", to_pos, 0.08)\
+			  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+			tw.tween_property(self, "position", to_pos + dir * 3.0, 0.01)\
+			  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw.tween_property(self, "position", to_pos, 0.01)\
+			  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			var tw2 := create_tween()
+			tw2.tween_property(self, "scale", Vector2(0.88, 0.85), 0.05)\
+			   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw2.tween_interval(0.02)
+			tw2.tween_property(self, "scale", Vector2(1.0, 1.0), 0.02)\
+			   .set_trans(Tween.TRANS_LINEAR)
+		"PLN":
+			var tw := create_tween()
+			tw.tween_property(self, "position", to_pos, 0.07)\
+			  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+		_:  # COR, GRD, and others
+			var tw := create_tween()
+			tw.tween_property(self, "position", to_pos, 0.16)\
+			  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 
 func play_attack(dir: int, success: bool) -> void:
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
