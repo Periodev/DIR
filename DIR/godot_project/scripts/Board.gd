@@ -154,6 +154,9 @@ func try_move(dir: int) -> bool:
 				inventory.register_move(dir)
 		else:
 			_resolve_attack(dir, target, target_type)
+		if player_pos == origin:
+			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
+			player_node.play_attack(dir, attack_hit)
 
 		if _begin_post_kill_reposition_if_needed(target, dir):
 			_refresh_visuals()
@@ -185,6 +188,7 @@ func try_charge_action() -> bool:
 		player_pos = target
 		score_manager.on_move_to_live()
 	else:
+		var pos_before_attack := player_pos
 		if _try_break_one_way_shield(target, dir, target_type):
 			return _finalize_turn_after_action()
 		if _get_attack_mode() == CharacterData.AttackMode.RAM:
@@ -193,6 +197,9 @@ func try_charge_action() -> bool:
 				player_pos = target
 		else:
 			_resolve_attack(dir, target, target_type)
+		if player_pos == pos_before_attack:
+			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
+			player_node.play_attack(dir, attack_hit)
 	return _finalize_turn_after_action()
 
 func try_wait() -> bool:
@@ -229,6 +236,8 @@ func try_bonus_move(dir: int) -> bool:
 			return true
 		if target_type != CharacterData.CellType.LIVE:
 			_resolve_attack(dir, target, target_type)
+			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
+			player_node.play_attack(dir, attack_hit)
 		game_state.set_state(CharacterData.GameStateEnum.IDLE)
 		_refresh_visuals()
 		_check_game_over()
@@ -632,10 +641,13 @@ func _refresh_visuals() -> void:
 		cell_nodes[player_pos.y][player_pos.x].set_candidate(10)
 
 	# Update player position
+	var old_player_visual_pos := player_node.position
 	player_node.position = Vector2(
 		player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
 		player_pos.y * CELL_STEP + CELL_SIZE / 2.0
 	)
+	if player_node.position != old_player_visual_pos:
+		player_node.play_move(old_player_visual_pos)
 
 	board_updated.emit()
 

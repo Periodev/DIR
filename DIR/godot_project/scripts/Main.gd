@@ -1,8 +1,8 @@
 extends Node
 
-const CURRENT_CHARACTER := "EXE"
+const CURRENT_CHARACTER := "PLN"
 const ATTACK_MODE_USE_CHARACTER := -1
-const CURRENT_ATTACK_MODE := CharacterData.AttackMode.STRIKE
+const CURRENT_ATTACK_MODE := CharacterData.AttackMode.RAM
 
 @onready var board: Node2D = $Board
 @onready var hud: CanvasLayer = $HUD
