@@ -4,7 +4,7 @@ enum Direction { NONE = 0, UP = 1, DOWN = 2, LEFT = 3, RIGHT = 4, NEUTRAL = 5 }
 
 enum CellType { LIVE, DEAD, DEAD_SHIELD, DEAD_DOUBLE, DEAD_ONE_WAY_SHIELD, DEAD_DOUBLE_LIFE }
 
-enum AttackMode { RAM, STRIKE }
+enum AttackMode { DASH, STRIKE }
 
 enum GameStateEnum { IDLE, GENERATING, BONUS_MOVE_SELECT, GAME_OVER }
 
@@ -38,12 +38,12 @@ const CHARACTERS := {
 		"has_charge_marker": false,
 		"charge_max": 0,
 		"has_ult":   false,
-		"attack_mode": AttackMode.RAM,
+		"attack_mode": AttackMode.DASH,
 		"has_pierce": true,
 		"has_penetrating_attack": false,
 		"has_post_kill_reposition": false,
 		"color":     Color(0.9, 0.2, 0.2),
-		"shape":     "pentagon",
+		"shape":     "diamond",
 	},
 	"COR": {
 		"seq":       3,
@@ -51,12 +51,12 @@ const CHARACTERS := {
 		"has_charge_marker": false,
 		"charge_max": 0,
 		"has_ult":   false,
-		"attack_mode": AttackMode.RAM,
+		"attack_mode": AttackMode.DASH,
 		"has_pierce": false,
 		"has_penetrating_attack": false,
 		"has_post_kill_reposition": false,
 		"color":     Color(0.2, 0.4, 0.9),
-		"shape":     "hexagon",
+		"shape":     "circle",
 	},
 	"PLN": {
 		"seq":       3,
@@ -64,7 +64,7 @@ const CHARACTERS := {
 		"has_charge_marker": false,
 		"charge_max": 0,
 		"has_ult":   true,
-		"attack_mode": AttackMode.RAM,
+		"attack_mode": AttackMode.DASH,
 		"has_pierce": false,
 		"has_penetrating_attack": false,
 		"has_post_kill_reposition": true,
@@ -77,7 +77,7 @@ const CHARACTERS := {
 		"has_charge_marker": false,
 		"charge_max": 0,
 		"has_ult":   false,
-		"attack_mode": AttackMode.RAM,
+		"attack_mode": AttackMode.DASH,
 		"has_pierce": false,
 		"has_penetrating_attack": false,
 		"has_post_kill_reposition": false,

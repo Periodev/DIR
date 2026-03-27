@@ -7,13 +7,26 @@ var cell_type: int = CharacterData.CellType.LIVE
 var shield_dir: int = CharacterData.Direction.NONE
 var grid_pos: Vector2i = Vector2i.ZERO
 var candidate_phase: int = 0  # 0=none, 1..4=spawn preview gradient, 10=bonus move
+var shield_alpha: float = 1.0
 
 func set_type(t: int) -> void:
 	cell_type = t
+	shield_alpha = 1.0
 	queue_redraw()
 
 func set_shield_dir(dir: int) -> void:
 	shield_dir = dir
+	shield_alpha = 1.0
+	queue_redraw()
+
+func flash_shield_break(delay: float) -> void:
+	var tw := create_tween()
+	tw.tween_interval(delay)
+	tw.tween_method(_set_shield_alpha, 1.0, 0.0, 0.05)\
+	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+func _set_shield_alpha(v: float) -> void:
+	shield_alpha = v
 	queue_redraw()
 
 func set_candidate(phase: int) -> void:
@@ -46,17 +59,21 @@ func _draw() -> void:
 	else:
 		draw_rect(rect, Color(0.6, 0.6, 0.6), false, 1.0)
 
-	# Dead indicator - red diamond
+	# Dead indicator - red octagon
 	var center = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
 	if cell_type != CharacterData.CellType.LIVE:
 		var r = DIAMOND_RADIUS
-		var diamond = PackedVector2Array([
+		var octagon = PackedVector2Array([
 			center + Vector2(0, -r),
+			center + Vector2(r * 0.7, -r * 0.7),
 			center + Vector2(r, 0),
+			center + Vector2(r * 0.7, r * 0.7),
 			center + Vector2(0, r),
+			center + Vector2(-r * 0.7, r * 0.7),
 			center + Vector2(-r, 0),
+			center + Vector2(-r * 0.7, -r * 0.7),
 		])
-		draw_polygon(diamond, PackedColorArray([Color(0.8, 0.15, 0.15)]))
+		draw_polygon(octagon, PackedColorArray([Color(0.8, 0.15, 0.15)]))
 
 		# DEAD_SHIELD: white border rectangle
 		if cell_type == CharacterData.CellType.DEAD_SHIELD:
@@ -85,33 +102,34 @@ func _draw() -> void:
 		if cell_type == CharacterData.CellType.DEAD_ONE_WAY_SHIELD:
 			var sr = r + 8.0
 			var half = r * 0.7
+			var shield_color := Color(1.0, 1.0, 1.0, shield_alpha)
 			match shield_dir:
 				CharacterData.Direction.UP:
 					draw_line(
 						center + Vector2(-half, -sr),
 						center + Vector2(half, -sr),
-						Color.WHITE,
+						shield_color,
 						5.0
 					)
 				CharacterData.Direction.DOWN:
 					draw_line(
 						center + Vector2(-half, sr),
 						center + Vector2(half, sr),
-						Color.WHITE,
+						shield_color,
 						5.0
 					)
 				CharacterData.Direction.LEFT:
 					draw_line(
 						center + Vector2(-sr, -half),
 						center + Vector2(-sr, half),
-						Color.WHITE,
+						shield_color,
 						5.0
 					)
 				CharacterData.Direction.RIGHT:
 					draw_line(
 						center + Vector2(sr, -half),
 						center + Vector2(sr, half),
-						Color.WHITE,
+						shield_color,
 						5.0
 					)
 

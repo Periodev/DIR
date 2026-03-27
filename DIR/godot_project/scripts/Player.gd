@@ -82,13 +82,22 @@ func play_move(from_pos: Vector2) -> void:
 			tw.tween_property(self, "position", to_pos, 0.16)\
 			  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 
-func play_attack(dir: int, success: bool) -> void:
+func play_attack(dir: int, success: bool, is_dash: bool = false) -> void:
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
+	var origin := position
+	if character_name == "COR" and is_dash and not success:
+		# Overlap 10% into enemy cell (cell_step=108, near edge=58, +10% of 100 = 68px)
+		var tip := origin + Vector2(dv) * 68.0
+		var tw := create_tween()
+		tw.tween_property(self, "position", tip, 0.10)\
+		  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+		tw.tween_property(self, "position", origin, 0.10)\
+		  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+		return
 	var lunge_dist: float = 30.0 if success else 12.0
 	var out_dur: float  = 0.08 if success else 0.05
 	var back_dur: float = 0.12 if success else 0.10
-	var origin := position
-	var tip := position + Vector2(dv) * lunge_dist
+	var tip := origin + Vector2(dv) * lunge_dist
 	var tw := create_tween()
 	tw.tween_property(self, "position", tip, out_dur)\
 	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)

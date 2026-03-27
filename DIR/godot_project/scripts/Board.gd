@@ -2,9 +2,9 @@ extends Node2D
 
 const COLS := 5
 const ROWS := 5
-const SPAWN_CYCLE_STEPS := 5
-const SPAWNS_PER_CYCLE := 2
-const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD_DOUBLE_LIFE
+const SPAWN_CYCLE_STEPS := 3
+const SPAWNS_PER_CYCLE := 1
+const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD_ONE_WAY_SHIELD
 const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
@@ -144,10 +144,12 @@ func try_move(dir: int) -> bool:
 		inventory.remove_at(match_idx)
 		player_facing_dir = dir
 		if _try_break_one_way_shield(target, dir, target_type):
+			cell_nodes[target.y][target.x].flash_shield_break(0.09)
+			player_node.play_attack(dir, false, _get_attack_mode() == CharacterData.AttackMode.DASH)
 			return _finalize_turn_after_action()
 		if _has_penetrating_attack():
 			_resolve_penetrating_attack(dir, origin, target, target_type)
-		elif _get_attack_mode() == CharacterData.AttackMode.RAM:
+		elif _get_attack_mode() == CharacterData.AttackMode.DASH:
 			_resolve_attack(dir, target, target_type)
 			if grid[target.y][target.x] == CharacterData.CellType.LIVE:
 				player_pos = target
@@ -156,7 +158,8 @@ func try_move(dir: int) -> bool:
 			_resolve_attack(dir, target, target_type)
 		if player_pos == origin:
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
-			player_node.play_attack(dir, attack_hit)
+			var was_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
+			player_node.play_attack(dir, attack_hit, was_dash)
 
 		if _begin_post_kill_reposition_if_needed(target, dir):
 			_refresh_visuals()
@@ -190,8 +193,10 @@ func try_charge_action() -> bool:
 	else:
 		var pos_before_attack := player_pos
 		if _try_break_one_way_shield(target, dir, target_type):
+			cell_nodes[target.y][target.x].flash_shield_break(0.09)
+			player_node.play_attack(dir, false, _get_attack_mode() == CharacterData.AttackMode.DASH)
 			return _finalize_turn_after_action()
-		if _get_attack_mode() == CharacterData.AttackMode.RAM:
+		if _get_attack_mode() == CharacterData.AttackMode.DASH:
 			_resolve_attack(dir, target, target_type)
 			if grid[target.y][target.x] == CharacterData.CellType.LIVE:
 				player_pos = target
@@ -199,13 +204,13 @@ func try_charge_action() -> bool:
 			_resolve_attack(dir, target, target_type)
 		if player_pos == pos_before_attack:
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
-			player_node.play_attack(dir, attack_hit)
+			var was_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
+			player_node.play_attack(dir, attack_hit, was_dash)
 	return _finalize_turn_after_action()
 
 func try_wait() -> bool:
 	if not game_state.is_idle():
 		return false
-	inventory.push(CharacterData.Direction.NEUTRAL)
 	return _finalize_turn_after_action()
 
 func try_bonus_move(dir: int) -> bool:
@@ -286,13 +291,13 @@ func _get_attack_mode() -> int:
 	if current_attack_mode_override >= 0:
 		return current_attack_mode_override
 	var data = CharacterData.CHARACTERS[current_character]
-	return data.get("attack_mode", CharacterData.AttackMode.RAM)
+	return data.get("attack_mode", CharacterData.AttackMode.DASH)
 
 func _has_pierce_passive() -> bool:
 	var data = CharacterData.CHARACTERS[current_character]
 	if not data.get("has_pierce", false):
 		return false
-	return _get_attack_mode() != CharacterData.AttackMode.RAM
+	return _get_attack_mode() != CharacterData.AttackMode.DASH
 
 func _get_move_memory_token(dir: int) -> int:
 	var data = CharacterData.CHARACTERS[current_character]
@@ -360,7 +365,7 @@ func _resolve_attack(dir: int, target: Vector2i, target_type: int) -> void:
 func _resolve_penetrating_attack(dir: int, origin: Vector2i, target: Vector2i, target_type: int) -> void:
 	_kill_flow(target, dir, target_type)
 
-	# If the first hit did not clear the target, RAM degrades into STRIKE and stays put.
+	# If the first hit did not clear the target, DASH degrades into STRIKE and stays put.
 	if grid[target.y][target.x] != CharacterData.CellType.LIVE:
 		player_pos = origin
 		return
