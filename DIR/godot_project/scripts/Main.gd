@@ -15,6 +15,7 @@ func _ready() -> void:
 	board.board_updated.connect(_on_board_updated)
 	board.score_manager.score_changed.connect(hud.update_score)
 	board.score_manager.combo_changed.connect(hud.update_combo)
+	board.score_manager.defeat_changed.connect(hud.update_defeats)
 
 	_on_board_updated()
 
@@ -75,6 +76,8 @@ func _on_board_updated() -> void:
 	hud.update_inventory(board.inventory)
 	hud.update_score(board.score_manager.score)
 	hud.update_combo(board.score_manager.combo_counter if board.score_manager.ENABLE_COMBO_BONUS else 0)
+	hud.update_defeats(board.score_manager.defeat_count)
+	hud.update_turns(board.survival_turns)
 	hud.update_freeze(board.freeze_steps)
 
 func _on_game_over(final_score: int) -> void:

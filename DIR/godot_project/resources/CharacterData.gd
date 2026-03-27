@@ -2,7 +2,7 @@ class_name CharacterData
 
 enum Direction { NONE = 0, UP = 1, DOWN = 2, LEFT = 3, RIGHT = 4, NEUTRAL = 5 }
 
-enum CellType { LIVE, DEAD, DEAD_SHIELD, DEAD_DOUBLE, DEAD_ONE_WAY_SHIELD }
+enum CellType { LIVE, DEAD, DEAD_SHIELD, DEAD_DOUBLE, DEAD_ONE_WAY_SHIELD, DEAD_DOUBLE_LIFE }
 
 enum AttackMode { RAM, STRIKE }
 

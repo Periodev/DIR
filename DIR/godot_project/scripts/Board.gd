@@ -2,9 +2,9 @@ extends Node2D
 
 const COLS := 5
 const ROWS := 5
-const SPAWN_CYCLE_STEPS := 3
+const SPAWN_CYCLE_STEPS := 5
 const SPAWNS_PER_CYCLE := 2
-const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD
+const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD_DOUBLE_LIFE
 const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
@@ -27,6 +27,7 @@ var bonus_move_is_attack: bool = false
 var cycle_counter: int = 0
 var freeze_steps: int = 0
 var pending_post_defense_step: bool = false
+var survival_turns: int = 0
 
 var inventory: Inventory
 var score_manager: ScoreManager
@@ -98,6 +99,7 @@ func restart() -> void:
 	cycle_resolved = false
 	freeze_steps = 0
 	pending_post_defense_step = false
+	survival_turns = 0
 
 	setup_character(current_character, current_attack_mode_override)
 	score_manager.reset()
@@ -144,9 +146,10 @@ func try_move(dir: int) -> bool:
 		if _has_penetrating_attack():
 			_resolve_penetrating_attack(dir, origin, target, target_type)
 		elif _get_attack_mode() == CharacterData.AttackMode.RAM:
-			player_pos = target
-			inventory.register_move(dir)
 			_resolve_attack(dir, target, target_type)
+			if grid[target.y][target.x] == CharacterData.CellType.LIVE:
+				player_pos = target
+				inventory.register_move(dir)
 		else:
 			_resolve_attack(dir, target, target_type)
 
@@ -183,9 +186,11 @@ func try_charge_action() -> bool:
 		if _try_break_one_way_shield(target, dir, target_type):
 			return _finalize_turn_after_action()
 		if _get_attack_mode() == CharacterData.AttackMode.RAM:
-			player_pos = target
-		_resolve_attack(dir, target, target_type)
-
+			_resolve_attack(dir, target, target_type)
+			if grid[target.y][target.x] == CharacterData.CellType.LIVE:
+				player_pos = target
+		else:
+			_resolve_attack(dir, target, target_type)
 	return _finalize_turn_after_action()
 
 func try_wait() -> bool:
@@ -344,9 +349,9 @@ func _resolve_attack(dir: int, target: Vector2i, target_type: int) -> void:
 func _resolve_penetrating_attack(dir: int, origin: Vector2i, target: Vector2i, target_type: int) -> void:
 	_kill_flow(target, dir, target_type)
 
-	# Fall back to RAM behavior when tunneling is not possible.
+	# If the first hit did not clear the target, RAM degrades into STRIKE and stays put.
 	if grid[target.y][target.x] != CharacterData.CellType.LIVE:
-		player_pos = target
+		player_pos = origin
 		return
 
 	var behind = target + CharacterData.DIR_VECTOR[dir]
@@ -386,6 +391,7 @@ func _begin_post_kill_reposition_if_needed(target: Vector2i, entry_dir: int) -> 
 	return true
 
 func _finalize_turn_after_action() -> bool:
+	survival_turns += 1
 	game_state.set_state(CharacterData.GameStateEnum.GENERATING)
 	_advance_cycle()
 	if _begin_post_defense_step_if_needed():
@@ -415,15 +421,22 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 			grid[pos.y][pos.x] = CharacterData.CellType.DEAD
 			cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
 			score_manager.combo_counter += 1
-			score_manager.on_kill(cell_type)
+			score_manager.on_kill(cell_type, false)
 			return
+
+	if cell_type == CharacterData.CellType.DEAD_DOUBLE_LIFE:
+		grid[pos.y][pos.x] = CharacterData.CellType.DEAD
+		cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
+		score_manager.combo_counter += 1
+		score_manager.on_kill(cell_type, false)
+		return
 
 	if cell_type == CharacterData.CellType.DEAD_SHIELD:
 		# First hit: become regular DEAD, still score
 		grid[pos.y][pos.x] = CharacterData.CellType.DEAD
 		cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
 		score_manager.combo_counter += 1
-		score_manager.on_kill(cell_type)
+		score_manager.on_kill(cell_type, false)
 		return
 
 	# Set to LIVE

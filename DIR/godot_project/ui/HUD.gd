@@ -2,6 +2,8 @@ extends CanvasLayer
 
 var score_label: Label
 var combo_label: Label
+var defeats_label: Label
+var turns_label: Label
 var inventory_container: HBoxContainer
 var inventory_panel: PanelContainer
 var hold_container: HBoxContainer
@@ -36,6 +38,22 @@ func _ready() -> void:
 	combo_label.position = Vector2(600, 55)
 	combo_label.size = Vector2(180, 30)
 	add_child(combo_label)
+
+	defeats_label = Label.new()
+	defeats_label.text = "BREAK 0"
+	defeats_label.add_theme_font_size_override("font_size", 20)
+	defeats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	defeats_label.position = Vector2(20, 48)
+	defeats_label.size = Vector2(180, 26)
+	add_child(defeats_label)
+
+	turns_label = Label.new()
+	turns_label.text = "TURN 0"
+	turns_label.add_theme_font_size_override("font_size", 20)
+	turns_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	turns_label.position = Vector2(20, 72)
+	turns_label.size = Vector2(180, 26)
+	add_child(turns_label)
 
 	# Inventory container - bottom
 	inventory_panel = PanelContainer.new()
@@ -178,6 +196,12 @@ func update_combo(combo: int) -> void:
 	else:
 		combo_label.text = ""
 
+func update_defeats(defeats: int) -> void:
+	defeats_label.text = "BREAK %d" % defeats
+
+func update_turns(turns: int) -> void:
+	turns_label.text = "TURN %d" % turns
+
 func update_freeze(steps: int) -> void:
 	if steps > 0:
 		freeze_label.text = "FREEZE: %d" % steps
@@ -201,6 +225,12 @@ func _layout_ui() -> void:
 
 	freeze_label.position = Vector2(20, 10)
 	freeze_label.size = Vector2(200, 30)
+
+	defeats_label.position = Vector2(20, 44)
+	defeats_label.size = Vector2(180, 26)
+
+	turns_label.position = Vector2(20, 68)
+	turns_label.size = Vector2(180, 26)
 
 	var inventory_width: float = min(viewport_size.x - 40.0, 960.0)
 	var inventory_x: float = (viewport_size.x - inventory_width) * 0.5
