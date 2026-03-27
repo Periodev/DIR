@@ -39,9 +39,11 @@ var cell_nodes: Array = []  # cell_nodes[row][col] = Cell node
 var player_node: Node2D
 
 var _cell_scene: PackedScene
+var _hit_effect_scene: PackedScene
 
 func _ready() -> void:
 	_cell_scene = load("res://scenes/Cell.tscn")
+	_hit_effect_scene = load("res://scenes/HitEffect.tscn")
 	var player_scene = load("res://scenes/Player.tscn")
 
 	inventory = Inventory.new()
@@ -415,6 +417,12 @@ func try_ultimate() -> bool:
 	_refresh_visuals()
 	return true
 
+func _spawn_hit_effect(pos: Vector2i) -> void:
+	var fx = _hit_effect_scene.instantiate()
+	fx.z_index = 5
+	fx.position = Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0, pos.y * CELL_STEP + CELL_SIZE / 2.0)
+	add_child(fx)
+
 func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 	if cell_type == CharacterData.CellType.DEAD_ONE_WAY_SHIELD:
 		if cell_shield_dirs[pos.y][pos.x] == CharacterData.OPPOSITE[attack_dir]:
@@ -444,6 +452,7 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 	cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
 	score_manager.combo_counter += 1
 	score_manager.on_kill(cell_type)
+	_spawn_hit_effect(pos)
 
 	# DEAD_DOUBLE: damage adjacent cells
 	if cell_type == CharacterData.CellType.DEAD_DOUBLE:
@@ -457,6 +466,7 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 				cell_shield_dirs[neighbor.y][neighbor.x] = CharacterData.Direction.NONE
 				score_manager.combo_counter += 1
 				score_manager.on_kill(n_type)
+				_spawn_hit_effect(neighbor)
 
 var cycle_resolved: bool = false  # true = this cycle already spawned, remaining turns idle
 
