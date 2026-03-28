@@ -144,7 +144,7 @@ func try_move(dir: int) -> bool:
 		inventory.remove_at(match_idx)
 		player_facing_dir = dir
 		if _try_break_one_way_shield(target, dir, target_type):
-			cell_nodes[target.y][target.x].flash_shield_break(0.09)
+			cell_nodes[target.y][target.x].flash_shield_break(0.17)
 			player_node.play_attack(dir, false, _get_attack_mode() == CharacterData.AttackMode.DASH)
 			return _finalize_turn_after_action()
 		if _has_penetrating_attack():
@@ -194,7 +194,7 @@ func try_charge_action() -> bool:
 	else:
 		var pos_before_attack := player_pos
 		if _try_break_one_way_shield(target, dir, target_type):
-			cell_nodes[target.y][target.x].flash_shield_break(0.09)
+			cell_nodes[target.y][target.x].flash_shield_break(0.17)
 			player_node.play_attack(dir, false, _get_attack_mode() == CharacterData.AttackMode.DASH)
 			return _finalize_turn_after_action()
 		if _get_attack_mode() == CharacterData.AttackMode.DASH:
