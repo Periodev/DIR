@@ -109,13 +109,14 @@ func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 	if is_dash and success:
 		_pending_penetration = true  # play_move 用滲透曲線
 	elif is_dash and not success:
-		# 同樣壓入感，但無停留，慢速黏滯回彈
-		var tip := origin + Vector2(dv) * 45.0
+		# 滲透失敗：同樣快速壓入（阻力感），約20%處被擋住，加速彈回
+		var tip := origin + Vector2(dv) * 60.0
 		var tw := create_tween()
-		tw.tween_property(self, "position", tip, 0.16)\
+		tw.tween_property(self, "position", tip, 0.14)\
 		  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-		tw.tween_property(self, "position", origin, 0.22)\
-		  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_interval(0.12)
+		tw.tween_property(self, "position", origin, 0.20)\
+		  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	else:
 		_attack_generic(dir, success)
 
