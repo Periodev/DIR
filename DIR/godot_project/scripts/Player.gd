@@ -1,5 +1,7 @@
 extends Node2D
 
+const PLNSlashEffect = preload("res://scripts/PLNSlashEffect.gd")
+
 var character_name: String = "COR"
 var character_color: Color = Color(0.2, 0.4, 0.9)
 var character_shape: String = "hexagon"
@@ -120,6 +122,12 @@ func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 func _attack_PLN(dir: int, success: bool, is_dash: bool) -> void:
 	if is_dash and success:
 		pass  # position handled by play_move
+	elif is_dash and not success:
+		var dv := Vector2(CharacterData.DIR_VECTOR[dir])
+		var fx := Node2D.new()
+		fx.set_script(PLNSlashEffect)
+		add_child(fx)
+		fx.setup(dv)
 	else:
 		_attack_generic(dir, success)
 
