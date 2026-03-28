@@ -5,6 +5,7 @@ const PLNSlashEffect = preload("res://scripts/PLNSlashEffect.gd")
 var character_name: String = "COR"
 var character_color: Color = Color(0.2, 0.4, 0.9)
 var character_shape: String = "hexagon"
+var facing_dir: int = CharacterData.Direction.UP
 var _pending_penetration: bool = false
 
 func set_character(char_name: String) -> void:
@@ -12,6 +13,14 @@ func set_character(char_name: String) -> void:
 	var data = CharacterData.CHARACTERS[char_name]
 	character_color = data["color"]
 	character_shape = data["shape"]
+	queue_redraw()
+
+func set_facing(dir: int) -> void:
+	if dir == CharacterData.Direction.NONE:
+		return
+	if dir == facing_dir:
+		return
+	facing_dir = dir
 	queue_redraw()
 
 func _draw() -> void:
@@ -40,12 +49,16 @@ func _draw() -> void:
 				Vector2(-20, 20),
 			])
 		"blade_diamond":
-			points = PackedVector2Array([
-				Vector2(0, -25),
-				Vector2(10, 0),
-				Vector2(0, 25),
-				Vector2(-10, 0),
+			var base := PackedVector2Array([
+				Vector2(0, -35),    # 前方尖端
+				Vector2(14, 0),     # 右側最寬
+				Vector2(0, 14),     # 後方直角頂點
+				Vector2(-14, 0),    # 左側最寬
 			])
+			var angle := _facing_to_angle(facing_dir)
+			points = PackedVector2Array()
+			for p in base:
+				points.append(p.rotated(angle))
 		_:
 			points = _make_polygon(6, 20.0, 0.0)
 
@@ -149,6 +162,14 @@ func _attack_generic(dir: int, success: bool) -> void:
 	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.tween_property(self, "position", origin, back_dur)\
 	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+func _facing_to_angle(dir: int) -> float:
+	match dir:
+		CharacterData.Direction.UP:    return 0.0
+		CharacterData.Direction.DOWN:  return PI
+		CharacterData.Direction.LEFT:  return -PI / 2.0
+		CharacterData.Direction.RIGHT: return PI / 2.0
+		_: return 0.0
 
 func _make_polygon(sides: int, radius: float, start_angle: float) -> PackedVector2Array:
 	var pts := PackedVector2Array()

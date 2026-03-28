@@ -1,6 +1,6 @@
 extends Node
 
-const CURRENT_CHARACTER := "PLN"
+const CURRENT_CHARACTER := "COR"
 const ATTACK_MODE_USE_CHARACTER := -1
 const CURRENT_ATTACK_MODE := CharacterData.AttackMode.DASH
 

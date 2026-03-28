@@ -708,6 +708,8 @@ func _refresh_visuals() -> void:
 	if bonus_move_can_stay:
 		cell_nodes[player_pos.y][player_pos.x].set_candidate(10)
 
+	player_node.set_facing(player_facing_dir)
+
 	# Update player position (skip if PLN move is deferred to timer)
 	if not _pln_defer_player_move:
 		var old_player_visual_pos := player_node.position
