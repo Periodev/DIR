@@ -83,20 +83,47 @@ func play_move(from_pos: Vector2) -> void:
 			  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 
 func play_attack(dir: int, success: bool, is_dash: bool = false) -> void:
+	match character_name:
+		"COR": _attack_COR(dir, success, is_dash)
+		"PLN": _attack_PLN(dir, success, is_dash)
+		"EXE": _attack_EXE(dir, success, is_dash)
+		"GRD": _attack_GRD(dir, success, is_dash)
+		_:     _attack_generic(dir, success)
+
+func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var origin := position
-	if character_name == "COR" and is_dash and not success:
-		# Overlap 10% into enemy cell (cell_step=108, near edge=58, +10% of 100 = 68px)
-		var tip := origin + Vector2(dv) * 68.0
+	if is_dash and success:
+		pass  # 移動到目標格由 play_move 處理，不需回彈
+	elif is_dash and not success:
+		# 同樣壓入感，但無停留，慢速黏滯回彈
+		var tip := origin + Vector2(dv) * 45.0
 		var tw := create_tween()
-		tw.tween_property(self, "position", tip, 0.10)\
-		  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-		tw.tween_property(self, "position", origin, 0.10)\
+		tw.tween_property(self, "position", tip, 0.16)\
 		  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-		return
+		tw.tween_property(self, "position", origin, 0.22)\
+		  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	else:
+		_attack_generic(dir, success)
+
+func _attack_PLN(dir: int, success: bool, is_dash: bool) -> void:
+	if is_dash and success:
+		pass  # position handled by play_move
+	else:
+		_attack_generic(dir, success)
+
+func _attack_EXE(dir: int, success: bool, _is_dash: bool) -> void:
+	_attack_generic(dir, success)
+
+func _attack_GRD(dir: int, success: bool, _is_dash: bool) -> void:
+	_attack_generic(dir, success)
+
+func _attack_generic(dir: int, success: bool) -> void:
+	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
+	var origin := position
 	var lunge_dist: float = 30.0 if success else 12.0
-	var out_dur: float  = 0.08 if success else 0.05
-	var back_dur: float = 0.12 if success else 0.10
+	var out_dur: float    = 0.08 if success else 0.05
+	var back_dur: float   = 0.12 if success else 0.10
 	var tip := origin + Vector2(dv) * lunge_dist
 	var tw := create_tween()
 	tw.tween_property(self, "position", tip, out_dur)\

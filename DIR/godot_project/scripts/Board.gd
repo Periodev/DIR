@@ -154,6 +154,7 @@ func try_move(dir: int) -> bool:
 			if grid[target.y][target.x] == CharacterData.CellType.LIVE:
 				player_pos = target
 				inventory.register_move(dir)
+				player_node.play_attack(dir, true, true)
 		else:
 			_resolve_attack(dir, target, target_type)
 		if player_pos == origin:

@@ -35,12 +35,7 @@ func set_candidate(phase: int) -> void:
 
 func _draw() -> void:
 	# Background
-	var bg_color: Color
-	match cell_type:
-		CharacterData.CellType.LIVE:
-			bg_color = Color(0.85, 0.85, 0.85)
-		_:
-			bg_color = Color(0.85, 0.85, 0.85)
+	var bg_color := Color(0.10, 0.10, 0.13)
 
 	var rect = Rect2(0, 0, CELL_SIZE, CELL_SIZE)
 	draw_rect(rect, bg_color)
@@ -57,7 +52,7 @@ func _draw() -> void:
 	elif candidate_phase == 10:
 		draw_rect(rect, Color(0.2, 0.8, 0.9), false, 3.0)
 	else:
-		draw_rect(rect, Color(0.6, 0.6, 0.6), false, 1.0)
+		draw_rect(rect, Color(0.25, 0.25, 0.30), false, 1.0)
 
 	# Dead indicator - red octagon
 	var center = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
