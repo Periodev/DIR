@@ -5,9 +5,9 @@ const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
 
 const COLS := 5
 const ROWS := 5
-const SPAWN_CYCLE_STEPS := 4
+const SPAWN_CYCLE_STEPS := 3
 const SPAWNS_PER_CYCLE := 2
-const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD_ONE_WAY_SHIELD
+const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD
 const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
@@ -367,6 +367,11 @@ func _try_break_one_way_shield(target: Vector2i, attack_dir: int, target_type: i
 	cell_shield_dirs[target.y][target.x] = CharacterData.Direction.NONE
 	score_manager.combo_counter += 1
 	score_manager.on_kill(target_type)
+	if current_character == "COR":
+		var player_vpos := Vector2(player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
+								   player_pos.y * CELL_STEP + CELL_SIZE / 2.0)
+		var stall_pos := player_vpos + Vector2(CharacterData.DIR_VECTOR[attack_dir]) * 50.0
+		_spawn_cor_ripple_weak(stall_pos)
 	return true
 
 func _get_shield_dir_toward_player(pos: Vector2i) -> int:
@@ -463,6 +468,15 @@ func try_ultimate() -> bool:
 	freeze_steps = 3
 	_refresh_visuals()
 	return true
+
+func _spawn_cor_ripple_weak(world_pos: Vector2) -> void:
+	get_tree().create_timer(0.14).timeout.connect(func() -> void:
+		var fx := Node2D.new()
+		fx.set_script(CORRippleEffect)
+		fx.set("weak", true)
+		fx.position = world_pos
+		add_child(fx)
+	)
 
 func _spawn_cor_ripple(pos: Vector2i) -> void:
 	var world_pos := Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0,
