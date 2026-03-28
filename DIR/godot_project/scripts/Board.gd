@@ -1,10 +1,12 @@
 extends Node2D
 
+const PLNSlashEffect = preload("res://scripts/PLNSlashEffect.gd")
+
 const COLS := 5
 const ROWS := 5
 const SPAWN_CYCLE_STEPS := 3
 const SPAWNS_PER_CYCLE := 1
-const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD
+const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD_ONE_WAY_SHIELD
 const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
@@ -26,6 +28,11 @@ var bonus_move_stores_directional_memory: bool = false
 var bonus_move_is_attack: bool = false
 var cycle_counter: int = 0
 var freeze_steps: int = 0
+var _pln_pending_kill_pos: Vector2i = Vector2i(-1, -1)
+var _pln_pending_kill_dir: int = CharacterData.Direction.NONE
+var _pln_frozen_kill_pos: Vector2i = Vector2i(-1, -1)
+var _suppress_hit_effect_once: bool = false
+var _pln_defer_player_move: bool = false
 var pending_post_defense_step: bool = false
 var survival_turns: int = 0
 
@@ -101,6 +108,11 @@ func restart() -> void:
 	cycle_resolved = false
 	freeze_steps = 0
 	pending_post_defense_step = false
+	_pln_pending_kill_pos = Vector2i(-1, -1)
+	_pln_pending_kill_dir = CharacterData.Direction.NONE
+	_pln_frozen_kill_pos = Vector2i(-1, -1)
+	_suppress_hit_effect_once = false
+	_pln_defer_player_move = false
 	survival_turns = 0
 
 	setup_character(current_character, current_attack_mode_override)
@@ -153,14 +165,30 @@ func try_move(dir: int) -> bool:
 			_resolve_attack(dir, target, target_type)
 			if grid[target.y][target.x] == CharacterData.CellType.LIVE:
 				player_pos = target
-				inventory.register_move(dir)
-				player_node.play_attack(dir, true, true)
+				if _has_post_kill_reposition():
+					_pln_pending_kill_pos = target
+					_pln_defer_player_move = true
+					# Spawn slash immediately at origin (normal windup rhythm)
+					var slash_fx := Node2D.new()
+					slash_fx.set_script(PLNSlashEffect)
+					slash_fx.position = Vector2(
+						origin.x * CELL_STEP + CELL_SIZE / 2.0,
+						origin.y * CELL_STEP + CELL_SIZE / 2.0
+					)
+					add_child(slash_fx)
+					slash_fx.setup(Vector2(dv), false, -1.0, true, 175.0)
+					# Delay player visual move until tip hits
+					get_tree().create_timer(PLNSlashEffect.WINDUP + 0.03).timeout.connect(_pln_trigger_move)
+				else:
+					inventory.register_move(dir)
+					player_node.play_attack(dir, true, true)
 		else:
 			_resolve_attack(dir, target, target_type)
 		if player_pos == origin:
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
 			var was_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
-			player_node.play_attack(dir, attack_hit, was_dash)
+			if _pln_pending_kill_pos == Vector2i(-1, -1):
+				player_node.play_attack(dir, attack_hit, was_dash)
 
 		if _begin_post_kill_reposition_if_needed(target, dir):
 			_refresh_visuals()
@@ -250,6 +278,9 @@ func try_bonus_move(dir: int) -> bool:
 		return true
 
 	player_pos = bonus_move_options[dir]
+	if _pln_pending_kill_pos != Vector2i(-1, -1):
+		inventory.register_move(dir)
+		_resolve_pln_kill_visual()
 	bonus_move_options.clear()
 	bonus_move_can_stay = false
 	if bonus_move_stores_directional_memory:
@@ -437,6 +468,22 @@ func _spawn_hit_effect(pos: Vector2i) -> void:
 	fx.z_index = 5
 	fx.position = Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0, pos.y * CELL_STEP + CELL_SIZE / 2.0)
 	add_child(fx)
+
+func _pln_trigger_move() -> void:
+	if not _pln_defer_player_move:
+		return
+	_pln_defer_player_move = false
+	var from_pos := player_node.position
+	var to_pos := Vector2(
+		player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
+		player_pos.y * CELL_STEP + CELL_SIZE / 2.0
+	)
+	if from_pos != to_pos:
+		player_node.position = to_pos
+		player_node.play_move(from_pos)
+
+func _resolve_pln_kill_visual() -> void:
+	_pln_pending_kill_pos = Vector2i(-1, -1)
 
 func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 	if cell_type == CharacterData.CellType.DEAD_ONE_WAY_SHIELD:
@@ -646,14 +693,15 @@ func _refresh_visuals() -> void:
 	if bonus_move_can_stay:
 		cell_nodes[player_pos.y][player_pos.x].set_candidate(10)
 
-	# Update player position
-	var old_player_visual_pos := player_node.position
-	player_node.position = Vector2(
-		player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
-		player_pos.y * CELL_STEP + CELL_SIZE / 2.0
-	)
-	if player_node.position != old_player_visual_pos:
-		player_node.play_move(old_player_visual_pos)
+	# Update player position (skip if PLN move is deferred to timer)
+	if not _pln_defer_player_move:
+		var old_player_visual_pos := player_node.position
+		player_node.position = Vector2(
+			player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
+			player_pos.y * CELL_STEP + CELL_SIZE / 2.0
+		)
+		if player_node.position != old_player_visual_pos:
+			player_node.play_move(old_player_visual_pos)
 
 	board_updated.emit()
 

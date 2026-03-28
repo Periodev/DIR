@@ -5,8 +5,8 @@ var slash_extent: float = 0.0  # 0..1  — tip travel distance
 var slash_alpha:  float = 0.0  # 0..1  — opacity (independent of extent)
 var spark_t:      float = 0.0
 
-const SLASH_LEN       := 130.0  # full — tip passes through enemy
-const SLASH_LEN_SHORT :=  78.0  # short — tip slightly overlaps enemy cell
+const SLASH_LEN       := 160.0  # full — tip passes through enemy
+const SLASH_LEN_SHORT := 120.0  # short — tip slightly overlaps enemy cell
 const BEHIND_LEN      :=  38.0
 const MAX_WIDTH       :=   5.0
 const MAX_WIDTH_SHORT :=   3.5  # slightly thinner for the blocked version
@@ -15,26 +15,31 @@ const SCAR_STEPS      :=  12
 const SPARK_SPREAD    := 14.0
 const SPARK_LEN       :=  9.0
 const SLASH_COLOR     := Color(0.15, 1.0, 0.55)
-const WINDUP          := 0.14
+const WINDUP          := 0.13
 
 var _slash_len: float  = SLASH_LEN
 var _max_width: float  = MAX_WIDTH
 
-func setup(dv: Vector2, short: bool = false) -> void:
+func setup(dv: Vector2, short: bool = false, windup_override: float = -1.0, no_sparks: bool = false, length_override: float = -1.0) -> void:
+	var actual_windup := WINDUP if windup_override < 0.0 else windup_override
 	dir_vec    = dv.normalized()
 	z_index    = 8
-	_slash_len = SLASH_LEN_SHORT if short else SLASH_LEN
-	_max_width = MAX_WIDTH_SHORT if short else MAX_WIDTH
+	if length_override >= 0.0:
+		_slash_len = length_override
+		_max_width = MAX_WIDTH
+	else:
+		_slash_len = SLASH_LEN_SHORT if short else SLASH_LEN
+		_max_width = MAX_WIDTH_SHORT if short else MAX_WIDTH
 
 	# Windup pause → tip extends out
 	var tw_ext := create_tween()
-	tw_ext.tween_interval(WINDUP)
+	tw_ext.tween_interval(actual_windup)
 	tw_ext.tween_method(_set_extent, 0.0, 1.0, 0.03)\
 		  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 
 	# Alpha: pause → snap in → hold → slow fade
 	var tw_a := create_tween()
-	tw_a.tween_interval(WINDUP)
+	tw_a.tween_interval(actual_windup)
 	tw_a.tween_method(_set_alpha, 0.0, 1.0, 0.02)\
 		.set_trans(Tween.TRANS_LINEAR)
 	tw_a.tween_interval(0.12)
@@ -43,10 +48,11 @@ func setup(dv: Vector2, short: bool = false) -> void:
 	tw_a.tween_callback(queue_free)
 
 	# Sparks trigger when tip arrives
-	var tw_sp := create_tween()
-	tw_sp.tween_interval(WINDUP + 0.03)
-	tw_sp.tween_method(_set_spark, 0.0, 1.0, 0.18)\
-		 .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	if not no_sparks:
+		var tw_sp := create_tween()
+		tw_sp.tween_interval(actual_windup + 0.03)
+		tw_sp.tween_method(_set_spark, 0.0, 1.0, 0.18)\
+			 .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _set_extent(t: float) -> void:
 	slash_extent = t
