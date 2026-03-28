@@ -1,11 +1,12 @@
 extends Node2D
 
 const PLNSlashEffect = preload("res://scripts/PLNSlashEffect.gd")
+const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
 
 const COLS := 5
 const ROWS := 5
-const SPAWN_CYCLE_STEPS := 3
-const SPAWNS_PER_CYCLE := 1
+const SPAWN_CYCLE_STEPS := 4
+const SPAWNS_PER_CYCLE := 2
 const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD_ONE_WAY_SHIELD
 const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
@@ -463,6 +464,16 @@ func try_ultimate() -> bool:
 	_refresh_visuals()
 	return true
 
+func _spawn_cor_ripple(pos: Vector2i) -> void:
+	var world_pos := Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0,
+							 pos.y * CELL_STEP + CELL_SIZE / 2.0)
+	get_tree().create_timer(0.15).timeout.connect(func() -> void:
+		var fx := Node2D.new()
+		fx.set_script(CORRippleEffect)
+		fx.position = world_pos
+		add_child(fx)
+	)
+
 func _spawn_hit_effect(pos: Vector2i) -> void:
 	var fx = _hit_effect_scene.instantiate()
 	fx.z_index = 5
@@ -515,6 +526,8 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 	score_manager.combo_counter += 1
 	score_manager.on_kill(cell_type)
 	_spawn_hit_effect(pos)
+	if current_character == "COR":
+		_spawn_cor_ripple(pos)
 
 	# DEAD_DOUBLE: damage adjacent cells
 	if cell_type == CharacterData.CellType.DEAD_DOUBLE:
@@ -529,6 +542,8 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 				score_manager.combo_counter += 1
 				score_manager.on_kill(n_type)
 				_spawn_hit_effect(neighbor)
+				if current_character == "COR":
+					_spawn_cor_ripple(neighbor)
 
 var cycle_resolved: bool = false  # true = this cycle already spawned, remaining turns idle
 
