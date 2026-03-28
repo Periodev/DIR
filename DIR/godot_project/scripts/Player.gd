@@ -3,6 +3,7 @@ extends Node2D
 var character_name: String = "COR"
 var character_color: Color = Color(0.2, 0.4, 0.9)
 var character_shape: String = "hexagon"
+var _pending_penetration: bool = false
 
 func set_character(char_name: String) -> void:
 	character_name = char_name
@@ -78,9 +79,19 @@ func play_move(from_pos: Vector2) -> void:
 			tw.tween_property(self, "position", to_pos, 0.07)\
 			  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 		_:  # COR, GRD, and others
-			var tw := create_tween()
-			tw.tween_property(self, "position", to_pos, 0.16)\
-			  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+			if character_name == "COR" and _pending_penetration:
+				_pending_penetration = false
+				# 滲透曲線：快速接近 → 半重疊前阻尼減速 → 推過後順滑完成
+				var resist := from_pos + (to_pos - from_pos) * 0.58
+				var tw := create_tween()
+				tw.tween_property(self, "position", resist, 0.15)\
+				  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
+				tw.tween_property(self, "position", to_pos, 0.09)\
+				  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+			else:
+				var tw := create_tween()
+				tw.tween_property(self, "position", to_pos, 0.16)\
+				  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 
 func play_attack(dir: int, success: bool, is_dash: bool = false) -> void:
 	match character_name:
@@ -94,7 +105,7 @@ func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var origin := position
 	if is_dash and success:
-		pass  # 移動到目標格由 play_move 處理，不需回彈
+		_pending_penetration = true  # play_move 用滲透曲線
 	elif is_dash and not success:
 		# 同樣壓入感，但無停留，慢速黏滯回彈
 		var tip := origin + Vector2(dv) * 45.0
