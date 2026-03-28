@@ -120,14 +120,12 @@ func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 		_attack_generic(dir, success)
 
 func _attack_PLN(dir: int, success: bool, is_dash: bool) -> void:
-	if is_dash and success:
-		pass  # position handled by play_move
-	elif is_dash and not success:
+	if is_dash:
 		var dv := Vector2(CharacterData.DIR_VECTOR[dir])
 		var fx := Node2D.new()
 		fx.set_script(PLNSlashEffect)
 		add_child(fx)
-		fx.setup(dv)
+		fx.setup(dv, not success)   # short=true when blocked
 	else:
 		_attack_generic(dir, success)
 

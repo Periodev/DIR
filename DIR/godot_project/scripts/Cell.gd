@@ -8,22 +8,31 @@ var shield_dir: int = CharacterData.Direction.NONE
 var grid_pos: Vector2i = Vector2i.ZERO
 var candidate_phase: int = 0  # 0=none, 1..4=spawn preview gradient, 10=bonus move
 var shield_alpha: float = 1.0
+var _break_shield_dir: int = CharacterData.Direction.NONE  # cached during flash
 
 func set_type(t: int) -> void:
 	cell_type = t
-	shield_alpha = 1.0
+	if _break_shield_dir == CharacterData.Direction.NONE:
+		shield_alpha = 1.0
 	queue_redraw()
 
 func set_shield_dir(dir: int) -> void:
 	shield_dir = dir
-	shield_alpha = 1.0
+	if _break_shield_dir == CharacterData.Direction.NONE:
+		shield_alpha = 1.0
 	queue_redraw()
 
 func flash_shield_break(delay: float) -> void:
+	_break_shield_dir = shield_dir
 	var tw := create_tween()
 	tw.tween_interval(delay)
-	tw.tween_method(_set_shield_alpha, 1.0, 0.0, 0.05)\
+	tw.tween_method(_set_shield_alpha, 1.0, 0.0, 0.12)\
 	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(_on_break_done)
+
+func _on_break_done() -> void:
+	_break_shield_dir = CharacterData.Direction.NONE
+	queue_redraw()
 
 func _set_shield_alpha(v: float) -> void:
 	shield_alpha = v
@@ -94,11 +103,13 @@ func _draw() -> void:
 			draw_polyline(inner_diamond + PackedVector2Array([inner_diamond[0]]), Color.WHITE, 2.0)
 
 		# DEAD_ONE_WAY_SHIELD: white guard line on one side
-		if cell_type == CharacterData.CellType.DEAD_ONE_WAY_SHIELD:
+		var _draw_dir := shield_dir if cell_type == CharacterData.CellType.DEAD_ONE_WAY_SHIELD \
+			else _break_shield_dir
+		if _draw_dir != CharacterData.Direction.NONE and shield_alpha > 0.0:
 			var sr = r + 8.0
 			var half = r * 0.7
 			var shield_color := Color(1.0, 1.0, 1.0, shield_alpha)
-			match shield_dir:
+			match _draw_dir:
 				CharacterData.Direction.UP:
 					draw_line(
 						center + Vector2(-half, -sr),
