@@ -178,7 +178,7 @@ func try_move(dir: int) -> bool:
 					add_child(slash_fx)
 					slash_fx.setup(Vector2(dv), false, -1.0, true, 175.0)
 					# Delay player visual move until tip hits
-					get_tree().create_timer(PLNSlashEffect.WINDUP + 0.03).timeout.connect(_pln_trigger_move)
+					get_tree().create_timer(PLNSlashEffect.WINDUP + 0.03 + 0.10).timeout.connect(_pln_trigger_move)
 				else:
 					inventory.register_move(dir)
 					player_node.play_attack(dir, true, true)
