@@ -1,8 +1,9 @@
 extends Node2D
 
-const PLNSlashEffect = preload("res://scripts/PLNSlashEffect.gd")
-const PLNMoveTrail   = preload("res://scripts/PLNMoveTrail.gd")
-const CORAttackArc   = preload("res://scripts/CORAttackArc.gd")
+const PLNSlashEffect  = preload("res://scripts/PLNSlashEffect.gd")
+const PLNMoveTrail    = preload("res://scripts/PLNMoveTrail.gd")
+const CORAttackArc    = preload("res://scripts/CORAttackArc.gd")
+const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
 
 var character_name: String = "COR"
 var character_color: Color = Color(0.2, 0.4, 0.9)
@@ -100,6 +101,12 @@ func play_move(from_pos: Vector2) -> void:
 			tw.tween_property(self, "position", to_pos, 0.07)\
 			  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 		_:  # COR, GRD, and others
+			if character_name == "COR":
+				var fx := Node2D.new()
+				fx.set_script(CORRippleEffect)
+				fx.set("single", true)
+				fx.position = from_pos
+				get_parent().add_child(fx)
 			if character_name == "COR" and _pending_penetration:
 				_pending_penetration = false
 				# 滲透曲線：快速接近 → 半重疊前阻尼減速 → 推過後順滑完成

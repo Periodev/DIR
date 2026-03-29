@@ -8,6 +8,8 @@ const GLOW_WIDTH  := 22.0
 
 # 設為 true（add_child 之前）產生三環弱波紋
 var weak: bool = false
+# 設為 true（add_child 之前）只產生一環
+var single: bool = false
 
 var ring1_t: float = 0.0
 var ring2_t: float = 0.0
@@ -18,7 +20,14 @@ var _max_r: float = MAX_RADIUS
 func _ready() -> void:
 	z_index = 6  # HitEffect(5) 之上
 
-	if weak:
+	if single:
+		_alpha_mult = 1.0
+		_max_r = 42.0
+		var tw1 := create_tween()
+		tw1.tween_method(_set_r1, 0.0, 1.0, 0.35)\
+		   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw1.tween_callback(queue_free)
+	elif weak:
 		_alpha_mult = 1.0
 		_max_r = 42.0
 		var tw1 := create_tween()
