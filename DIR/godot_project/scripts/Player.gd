@@ -53,7 +53,7 @@ func _draw() -> void:
 			var base := PackedVector2Array([
 				Vector2(0, -35),    # 前方尖端
 				Vector2(14, 0),     # 右側最寬
-				Vector2(0, 14),     # 後方直角頂點
+				Vector2(0, 14.0 * sqrt(3)),  # 後方 60° 銳角頂點
 				Vector2(-14, 0),    # 左側最寬
 			])
 			var angle := _facing_to_angle(facing_dir)
