@@ -4,6 +4,8 @@ const PLNSlashEffect  = preload("res://scripts/PLNSlashEffect.gd")
 const PLNMoveTrail    = preload("res://scripts/PLNMoveTrail.gd")
 const CORAttackArc    = preload("res://scripts/CORAttackArc.gd")
 const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
+const CORChargeRipple = preload("res://scripts/CORChargeRipple.gd")
+const COR_CHARGE_DUR  := 0.15
 const EXEJetEffect    = preload("res://scripts/EXEJetEffect.gd")
 const EXEImpactArc    = preload("res://scripts/EXEImpactArc.gd")
 const EXEImpactArcHit = preload("res://scripts/EXEImpactArcHit.gd")
@@ -117,9 +119,10 @@ func play_move(from_pos: Vector2) -> void:
 				get_parent().add_child(fx)
 			if character_name == "COR" and _pending_penetration:
 				_pending_penetration = false
-				# 滲透曲線：快速接近 → 半重疊前阻尼減速 → 推過後順滑完成
+				# 滲透曲線：蓄力停頓 → 快速接近 → 半重疊前阻尼減速 → 推過後順滑完成
 				var resist := from_pos + (to_pos - from_pos) * 0.58
 				var tw := create_tween()
+				tw.tween_interval(COR_CHARGE_DUR)
 				tw.tween_property(self, "position", resist, 0.15)\
 				  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 				tw.tween_interval(0.09)
@@ -141,25 +144,36 @@ func play_attack(dir: int, success: bool, is_dash: bool = false) -> void:
 func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var origin := position
+
+	# 蓄力波紋（所有攻擊共用）
+	var charge_fx := Node2D.new()
+	charge_fx.set_script(CORChargeRipple)
+	charge_fx.position = origin
+	get_parent().add_child(charge_fx)
+
 	if is_dash and success:
-		_pending_penetration = true  # play_move 用滲透曲線
+		_pending_penetration = true  # play_move 用滲透曲線（內含 COR_CHARGE_DUR 延遲）
 	elif is_dash and not success:
-		# 滲透失敗：同樣快速壓入（阻力感），約20%處被擋住，加速彈回
+		# 滲透失敗：停頓後壓入被擋，彈回
 		var tip := origin + Vector2(dv) * 60.0
 		var tw := create_tween()
+		tw.tween_interval(COR_CHARGE_DUR)
 		tw.tween_property(self, "position", tip, 0.14)\
 		  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 		tw.tween_interval(0.20)
 		tw.tween_property(self, "position", origin, 0.15)\
 		  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	else:
-		# STRIKE：先放弧形，再做點刺動畫
-		var fx := Node2D.new()
-		fx.set_script(CORAttackArc)
-		fx.set("dir_vec", Vector2(dv))
-		fx.position = origin
-		get_parent().add_child(fx)
-		_attack_generic(dir, success)
+		# STRIKE：停頓後放弧 + 點刺
+		var tw_delay := create_tween()
+		tw_delay.tween_interval(COR_CHARGE_DUR)
+		tw_delay.tween_callback(func():
+			var fx := Node2D.new()
+			fx.set_script(CORAttackArc)
+			fx.set("dir_vec", Vector2(dv))
+			fx.position = origin
+			get_parent().add_child(fx)
+			_attack_generic(dir, success))
 
 func _attack_PLN(dir: int, success: bool, is_dash: bool) -> void:
 	if is_dash:
@@ -241,7 +255,7 @@ func get_hit_delay(is_dash: bool = false) -> float:
 	match character_name:
 		"EXE": return 0.22         # pull(0.01) + pause(0.15) + dash(0.06)
 		"PLN": return 0.16         # windup(0.13) + tip_extend(0.03)
-		"COR": return 0.15 if is_dash else 0.08   # DASH: resist到位；STRIKE: generic out_dur
+		"COR": return COR_CHARGE_DUR + (0.15 if is_dash else 0.08)
 		_:     return 0.08         # GRD 及其他，generic out_dur
 
 func _facing_to_angle(dir: int) -> float:
