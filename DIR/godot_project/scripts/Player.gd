@@ -79,8 +79,8 @@ func play_move(from_pos: Vector2) -> void:
 			# [4] Hard stop    0.02s — single minimal settle, nearly no bounce
 			var dir := (to_pos - from_pos).normalized()
 			var tw := create_tween()
-			tw.tween_interval(0.07)
-			tw.tween_property(self, "position", to_pos, 0.08)\
+			tw.tween_interval(0.04)
+			tw.tween_property(self, "position", to_pos, 0.07)\
 			  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
 			tw.tween_property(self, "position", to_pos + dir * 3.0, 0.01)\
 			  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
