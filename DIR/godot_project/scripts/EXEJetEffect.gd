@@ -25,7 +25,7 @@ const SEC_POOL := [
 const INNER_R := 3.0
 
 var dir_vec: Vector2 = Vector2.DOWN
-var time_scale: float = 2.0   # 放慢倍率，1.0 = 正常，2.0 = 慢兩倍
+var time_scale: float = 1.2   # 放慢倍率，1.0 = 正常，2.0 = 慢兩倍
 var _compress_phase: bool = true
 var _release_t:  float = 0.0
 var _sec_alpha:  float = 1.0

@@ -1,13 +1,14 @@
 extends Node
 
-const CURRENT_CHARACTER := "PLN"
+const DEBUG_CHARACTERS := ["PLN", "EXE", "COR"]
+var _debug_char_idx: int = 0
 
 @onready var board: Node2D = $Board
 @onready var hud: CanvasLayer = $HUD
 
 func _ready() -> void:
-	board.setup_character(CURRENT_CHARACTER)
-	hud.setup(CURRENT_CHARACTER)
+	board.setup_character(DEBUG_CHARACTERS[_debug_char_idx])
+	hud.setup(DEBUG_CHARACTERS[_debug_char_idx])
 
 	board.game_over_signal.connect(_on_game_over)
 	board.board_updated.connect(_on_board_updated)
@@ -26,7 +27,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Restart
 	if keycode == KEY_R:
 		board.restart()
-		hud.setup(CURRENT_CHARACTER)
+		hud.setup(DEBUG_CHARACTERS[_debug_char_idx])
+		_on_board_updated()
+		get_viewport().set_input_as_handled()
+		return
+
+	# Debug: cycle character (F4)
+	if keycode == KEY_F4:
+		_debug_char_idx = (_debug_char_idx + 1) % DEBUG_CHARACTERS.size()
+		var ch: String = DEBUG_CHARACTERS[_debug_char_idx]
+		board.setup_character(ch)
+		board.restart()
+		hud.setup(ch)
 		_on_board_updated()
 		get_viewport().set_input_as_handled()
 		return
