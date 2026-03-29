@@ -1,6 +1,7 @@
 extends Node2D
 
 const PLNSlashEffect = preload("res://scripts/PLNSlashEffect.gd")
+const CORAttackArc   = preload("res://scripts/CORAttackArc.gd")
 
 var character_name: String = "COR"
 var character_color: Color = Color(0.2, 0.4, 0.9)
@@ -132,6 +133,12 @@ func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 		tw.tween_property(self, "position", origin, 0.15)\
 		  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	else:
+		# STRIKE：先放弧形，再做點刺動畫
+		var fx := Node2D.new()
+		fx.set_script(CORAttackArc)
+		fx.set("dir_vec", Vector2(dv))
+		fx.position = origin
+		get_parent().add_child(fx)
 		_attack_generic(dir, success)
 
 func _attack_PLN(dir: int, success: bool, is_dash: bool) -> void:
