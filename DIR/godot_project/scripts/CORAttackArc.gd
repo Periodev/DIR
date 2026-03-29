@@ -16,19 +16,14 @@ func _ready() -> void:
 	z_index = 7   # CORRippleEffect(6) 之上，Player(10) 之下
 
 	var tw1 := create_tween()
-	tw1.tween_method(_set_a1, 0.0, 1.0, 0.25)\
+	tw1.tween_method(_set_a1, 0.0, 1.0, 0.18)\
 	   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
-	var tw2 := create_tween()
-	tw2.tween_interval(0.07)
-	tw2.tween_method(_set_a2, 0.0, 1.0, 0.25)\
-	   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-
-	var tw3 := create_tween()
-	tw3.tween_interval(0.14)
-	tw3.tween_method(_set_a3, 0.0, 1.0, 0.25)\
-	   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw3.tween_callback(queue_free)
+	#var tw2 := create_tween()
+	#tw2.tween_interval(0.09)
+	#tw2.tween_method(_set_a2, 0.0, 1.0, 0.18)\
+	#   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	#tw2.tween_callback(queue_free)
 
 func _set_a1(t: float) -> void: arc1_t = t; queue_redraw()
 func _set_a2(t: float) -> void: arc2_t = t; queue_redraw()
@@ -37,7 +32,6 @@ func _set_a3(t: float) -> void: arc3_t = t; queue_redraw()
 func _draw() -> void:
 	_draw_arc(arc1_t)
 	_draw_arc(arc2_t)
-	_draw_arc(arc3_t)
 
 func _draw_arc(t: float) -> void:
 	if t <= 0.0:

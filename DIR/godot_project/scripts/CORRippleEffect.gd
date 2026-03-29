@@ -46,20 +46,14 @@ func _ready() -> void:
 		tw3.tween_callback(queue_free)
 	else:
 		var tw1 := create_tween()
-		tw1.tween_method(_set_r1, 0.0, 1.0, 0.45)\
+		tw1.tween_method(_set_r1, 0.0, 1.0, 0.35)\
 		   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 		var tw2 := create_tween()
-		tw2.tween_interval(0.10)
-		tw2.tween_method(_set_r2, 0.0, 1.0, 0.45)\
+		tw2.tween_interval(0.08)
+		tw2.tween_method(_set_r2, 0.0, 1.0, 0.35)\
 		   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-
-		var tw3 := create_tween()
-		tw3.tween_interval(0.20)
-		tw3.tween_method(_set_r3, 0.0, 1.0, 0.45)\
-		   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-
-		tw3.tween_callback(queue_free)
+		tw2.tween_callback(queue_free)
 
 func _set_r1(t: float) -> void:
 	ring1_t = t
