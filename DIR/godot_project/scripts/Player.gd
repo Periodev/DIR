@@ -4,6 +4,7 @@ const PLNSlashEffect  = preload("res://scripts/PLNSlashEffect.gd")
 const PLNMoveTrail    = preload("res://scripts/PLNMoveTrail.gd")
 const CORAttackArc    = preload("res://scripts/CORAttackArc.gd")
 const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
+const EXEJetEffect    = preload("res://scripts/EXEJetEffect.gd")
 
 var character_name: String = "COR"
 var character_color: Color = Color(0.2, 0.4, 0.9)
@@ -78,6 +79,11 @@ func play_move(from_pos: Vector2) -> void:
 			# [3] Dash         0.08s — EASE_IN burst, no deform, heavy object launched
 			# [4] Hard stop    0.02s — single minimal settle, nearly no bounce
 			var dir := (to_pos - from_pos).normalized()
+			var jet := Node2D.new()
+			jet.set_script(EXEJetEffect)
+			jet.set("dir_vec", -dir)
+			jet.position = from_pos
+			get_parent().add_child(jet)
 			var tw := create_tween()
 			tw.tween_interval(0.04)
 			tw.tween_property(self, "position", to_pos, 0.07)\
@@ -164,7 +170,42 @@ func _attack_PLN(dir: int, success: bool, is_dash: bool) -> void:
 		_attack_generic(dir, success)
 
 func _attack_EXE(dir: int, success: bool, _is_dash: bool) -> void:
-	_attack_generic(dir, success)
+	var dv := Vector2(CharacterData.DIR_VECTOR[dir])
+	var origin := position
+
+	# 時間軸
+	var pull_dur  := 0.01                          # 後退
+	var pause_dur := 0.15                          # 停頓
+	var dash_dur  := 0.06 if success else 0.04    # 衝出
+	var back_dur  := 0.10 if success else 0.07    # 回歸
+	var pull_dist := 10.0                          # 後退距離
+	var lunge_dist := 75.0 if success else 55.0   # 衝出距離（接近/抵達敵人）
+	var pre_delay := pull_dur + pause_dur
+
+	# 衝出瞬間的強力 jet（後方噴射，最長主線，滿副線）
+	var jet1 := Node2D.new()
+	jet1.set_script(EXEJetEffect)
+	jet1.set("dir_vec", -dv)
+	jet1.set("force_main_idx", 2)
+	jet1.set("use_attack_pool", true)
+	jet1.set("time_scale", 1.2)
+	var tw_j1 := create_tween()
+	tw_j1.tween_interval(pre_delay)
+	tw_j1.tween_callback(func():
+		jet1.position = origin - dv * pull_dist
+		get_parent().add_child(jet1))
+
+
+	# 位移：後退 → 停頓 → 衝出（越過格碰到敵人）→ 回歸
+	var tw := create_tween()
+	tw.tween_property(self, "position", origin - dv * pull_dist, pull_dur)\
+	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(pause_dur)
+	tw.tween_property(self, "position", origin + dv * lunge_dist, dash_dur)\
+	  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
+	tw.tween_interval(0.25)  # 撞擊停頓
+	tw.tween_property(self, "position", origin, back_dur)\
+	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 func _attack_GRD(dir: int, success: bool, _is_dash: bool) -> void:
 	_attack_generic(dir, success)

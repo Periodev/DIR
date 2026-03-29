@@ -22,10 +22,23 @@ const SEC_POOL := [
 	[-32.0, 12.0, Vector2(-1.0,  0.0), false],
 	[ 10.0, 26.0, Vector2( 0.0, -1.0), false],
 ]
+# 攻擊副線池（6 條，大角度擴散），隨機取 3 條
+const ATTACK_SEC_POOL := [
+	[-48.0, 22.0, Vector2(-1.0,  1.0), false],
+	[ 42.0, 20.0, Vector2( 1.0,  0.0), false],
+	[-28.0, 26.0, Vector2(-1.0, -1.0), false],
+	[ 55.0, 18.0, Vector2( 1.0,  1.0), false],
+	[-18.0, 24.0, Vector2( 0.0,  1.0), false],
+	[ 38.0, 16.0, Vector2( 1.0, -1.0), false],
+]
 const INNER_R := 3.0
 
 var dir_vec: Vector2 = Vector2.DOWN
+var use_attack_pool: bool = false
 var time_scale: float = 1.2   # 放慢倍率，1.0 = 正常，2.0 = 慢兩倍
+var force_main_idx: int = -1  # -1 = 隨機；0/1/2 = 固定選哪條主線
+var force_sec_count: int = -1 # -1 = 隨機 3–5；正整數 = 固定副線數
+var compress_dur: float = 0.04 # compress phase 持續時間
 var _compress_phase: bool = true
 var _release_t:  float = 0.0
 var _sec_alpha:  float = 1.0
@@ -35,30 +48,38 @@ var _lines: Array = []
 
 func _ready() -> void:
 	z_index = 9
-	# 抽副線：shuffle 後取前 randi_range(3,5) 條
+	# 主線：force_main_idx >= 0 時固定，否則隨機
+	var main_line = MAIN_POOL[force_main_idx] if force_main_idx >= 0 else MAIN_POOL[randi() % 3]
+	# 一般副線：隨機 3–5 條
 	var pool := SEC_POOL.duplicate()
 	pool.shuffle()
-	_lines = [MAIN_POOL[randi() % 3]] + pool.slice(0, randi_range(3, 5))
+	var sec_count := force_sec_count if force_sec_count > 0 else randi_range(3, 5)
+	_lines = [main_line] + pool.slice(0, sec_count)
+	# 攻擊模式：額外加 3 條大角度擴散副線
+	if use_attack_pool:
+		var atk_pool := ATTACK_SEC_POOL.duplicate()
+		atk_pool.shuffle()
+		_lines += atk_pool.slice(0, 3)
 	var s := time_scale
+	var cd := compress_dur
 	var tw_r := create_tween()
-	tw_r.tween_interval(0.04 * s)
+	tw_r.tween_interval(cd * s)
 	tw_r.tween_callback(_start_release)
 	tw_r.tween_method(_set_release_t, 0.0, 1.0, 0.12 * s)\
 	    .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
 
 	var tw_s := create_tween()
-	tw_s.tween_interval(0.04 * s)
+	tw_s.tween_interval(cd * s)
 	tw_s.tween_method(_set_sec_alpha, 1.0, 0.0, 0.14 * s)\
 	    .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
 	var tw_m := create_tween()
-	tw_m.tween_interval(0.06 * s)
+	tw_m.tween_interval((cd + 0.02) * s)
 	tw_m.tween_method(_set_main_alpha, 1.0, 0.0, 0.20 * s)\
 	    .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 
-
 	var tw_f := create_tween()
-	tw_f.tween_interval(0.28 * s)
+	tw_f.tween_interval((cd + 0.24) * s)
 	tw_f.tween_callback(queue_free)
 
 func _start_release()    -> void: _compress_phase = false
