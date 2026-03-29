@@ -1,14 +1,12 @@
 extends Node
 
-const CURRENT_CHARACTER := "COR"
-const ATTACK_MODE_USE_CHARACTER := -1
-const CURRENT_ATTACK_MODE := CharacterData.AttackMode.STRIKE
+const CURRENT_CHARACTER := "PLN"
 
 @onready var board: Node2D = $Board
 @onready var hud: CanvasLayer = $HUD
 
 func _ready() -> void:
-	board.setup_character(CURRENT_CHARACTER, CURRENT_ATTACK_MODE)
+	board.setup_character(CURRENT_CHARACTER)
 	hud.setup(CURRENT_CHARACTER)
 
 	board.game_over_signal.connect(_on_game_over)

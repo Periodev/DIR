@@ -1,6 +1,7 @@
 extends Node2D
 
 const PLNSlashEffect = preload("res://scripts/PLNSlashEffect.gd")
+const PLNMoveTrail   = preload("res://scripts/PLNMoveTrail.gd")
 const CORAttackArc   = preload("res://scripts/CORAttackArc.gd")
 
 var character_name: String = "COR"
@@ -91,6 +92,10 @@ func play_move(from_pos: Vector2) -> void:
 			tw2.tween_property(self, "scale", Vector2(1.0, 1.0), 0.02)\
 			   .set_trans(Tween.TRANS_LINEAR)
 		"PLN":
+			var trail := Node2D.new()
+			trail.set_script(PLNMoveTrail)
+			get_parent().add_child(trail)
+			trail.setup(from_pos, to_pos)
 			var tw := create_tween()
 			tw.tween_property(self, "position", to_pos, 0.07)\
 			  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
