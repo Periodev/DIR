@@ -4,7 +4,7 @@ const COLOR     := Color(0.95, 0.40, 0.05)   # EXE jet orange
 const ARC_WIDTH  :=  8.0
 const GLOW_WIDTH := 30.0   # 比 COR 更發散
 const MIN_R      := 14.0
-const MAX_R      := 80.0
+const MAX_R      := 58.0
 const SPREAD     := PI / 3.0   # ±60°，共 120°
 
 var dir_vec: Vector2 = Vector2.UP
