@@ -223,6 +223,13 @@ func _attack_generic(dir: int, success: bool) -> void:
 	tw.tween_property(self, "position", origin, back_dur)\
 	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
+func get_hit_delay(is_dash: bool = false) -> float:
+	match character_name:
+		"EXE": return 0.22         # pull(0.01) + pause(0.15) + dash(0.06)
+		"PLN": return 0.16         # windup(0.13) + tip_extend(0.03)
+		"COR": return 0.15 if is_dash else 0.08   # DASH: resist到位；STRIKE: generic out_dur
+		_:     return 0.08         # GRD 及其他，generic out_dur
+
 func _facing_to_angle(dir: int) -> float:
 	match dir:
 		CharacterData.Direction.UP:    return 0.0

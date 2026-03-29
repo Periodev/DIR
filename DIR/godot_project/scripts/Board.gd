@@ -34,6 +34,7 @@ var _pln_pending_kill_dir: int = CharacterData.Direction.NONE
 var _pln_frozen_kill_pos: Vector2i = Vector2i(-1, -1)
 var _suppress_hit_effect_once: bool = false
 var _pln_defer_player_move: bool = false
+var _pending_kill_visual: Array[Vector2i] = []  # 正在等待延遲視覺更新的格子
 var pending_post_defense_step: bool = false
 var survival_turns: int = 0
 
@@ -114,6 +115,7 @@ func restart() -> void:
 	_pln_frozen_kill_pos = Vector2i(-1, -1)
 	_suppress_hit_effect_once = false
 	_pln_defer_player_move = false
+	_pending_kill_visual.clear()
 	survival_turns = 0
 
 	setup_character(current_character, current_attack_mode_override)
@@ -493,10 +495,19 @@ func _spawn_cor_ripple(pos: Vector2i) -> void:
 	)
 
 func _spawn_hit_effect(pos: Vector2i) -> void:
-	var fx = _hit_effect_scene.instantiate()
-	fx.z_index = 5
-	fx.position = Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0, pos.y * CELL_STEP + CELL_SIZE / 2.0)
-	add_child(fx)
+	var is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
+	var delay: float = player_node.get_hit_delay(is_dash)
+	var world_pos := Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0,
+							 pos.y * CELL_STEP + CELL_SIZE / 2.0)
+	_pending_kill_visual.append(pos)
+	get_tree().create_timer(delay).timeout.connect(func():
+		_pending_kill_visual.erase(pos)
+		cell_nodes[pos.y][pos.x].set_type(CharacterData.CellType.LIVE)
+		cell_nodes[pos.y][pos.x].set_shield_dir(CharacterData.Direction.NONE)
+		var fx := _hit_effect_scene.instantiate()
+		fx.z_index = 5
+		fx.position = world_pos
+		add_child(fx))
 
 func _pln_trigger_move() -> void:
 	if not _pln_defer_player_move:
@@ -712,6 +723,9 @@ func _refresh_visuals() -> void:
 	# Update all cells
 	for r in ROWS:
 		for c in COLS:
+			var pos := Vector2i(c, r)
+			if pos in _pending_kill_visual:
+				continue   # 延遲處理，保持 DEAD 外觀
 			var cell = cell_nodes[r][c]
 			cell.set_type(grid[r][c])
 			cell.set_shield_dir(cell_shield_dirs[r][c])

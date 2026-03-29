@@ -5,7 +5,7 @@ const FLASH_RADIUS := 33.0
 
 func _ready() -> void:
 	var tw := create_tween()
-	tw.tween_interval(0.16)
+	tw.tween_interval(0.05)
 	tw.tween_method(_set_color, Color(0.8, 0.15, 0.15, 1.0), Color(1.0, 1.0, 1.0, 1.0), 0.05)\
 	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tw.tween_method(_set_color, Color(1.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 1.0, 0.0), 0.35)\
