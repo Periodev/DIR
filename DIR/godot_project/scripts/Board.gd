@@ -5,9 +5,9 @@ const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
 
 const COLS := 5
 const ROWS := 5
-const SPAWN_CYCLE_STEPS := 3
+const SPAWN_CYCLE_STEPS := 4
 const SPAWNS_PER_CYCLE := 2
-const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD
+const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD_DOUBLE_LIFE
 const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
@@ -311,6 +311,7 @@ func try_bonus_stay() -> bool:
 	bonus_move_stores_memory = false
 	bonus_move_stores_directional_memory = false
 	bonus_move_is_attack = false
+	_pln_pending_kill_pos = Vector2i(-1, -1)
 	if bonus_move_advances_turn:
 		bonus_move_advances_turn = false
 		return _finalize_turn_after_action()
@@ -367,11 +368,7 @@ func _try_break_one_way_shield(target: Vector2i, attack_dir: int, target_type: i
 	cell_shield_dirs[target.y][target.x] = CharacterData.Direction.NONE
 	score_manager.combo_counter += 1
 	score_manager.on_kill(target_type)
-	if current_character == "COR":
-		var player_vpos := Vector2(player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
-								   player_pos.y * CELL_STEP + CELL_SIZE / 2.0)
-		var stall_pos := player_vpos + Vector2(CharacterData.DIR_VECTOR[attack_dir]) * 50.0
-		_spawn_cor_ripple_weak(stall_pos)
+	_on_failed_kill(attack_dir)
 	return true
 
 func _get_shield_dir_toward_player(pos: Vector2i) -> int:
@@ -469,6 +466,13 @@ func try_ultimate() -> bool:
 	_refresh_visuals()
 	return true
 
+func _on_failed_kill(attack_dir: int) -> void:
+	if current_character == "COR":
+		var player_vpos := Vector2(player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
+								   player_pos.y * CELL_STEP + CELL_SIZE / 2.0)
+		var stall_pos := player_vpos + Vector2(CharacterData.DIR_VECTOR[attack_dir]) * 60.0
+		_spawn_cor_ripple_weak(stall_pos)
+
 func _spawn_cor_ripple_weak(world_pos: Vector2) -> void:
 	get_tree().create_timer(0.14).timeout.connect(func() -> void:
 		var fx := Node2D.new()
@@ -517,6 +521,7 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 			cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
 			score_manager.combo_counter += 1
 			score_manager.on_kill(cell_type, false)
+			_on_failed_kill(attack_dir)
 			return
 
 	if cell_type == CharacterData.CellType.DEAD_DOUBLE_LIFE:
@@ -524,6 +529,7 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 		cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
 		score_manager.combo_counter += 1
 		score_manager.on_kill(cell_type, false)
+		_on_failed_kill(attack_dir)
 		return
 
 	if cell_type == CharacterData.CellType.DEAD_SHIELD:
@@ -532,6 +538,7 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 		cell_shield_dirs[pos.y][pos.x] = CharacterData.Direction.NONE
 		score_manager.combo_counter += 1
 		score_manager.on_kill(cell_type, false)
+		_on_failed_kill(attack_dir)
 		return
 
 	# Set to LIVE
