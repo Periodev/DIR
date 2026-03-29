@@ -6,6 +6,7 @@ const CORAttackArc    = preload("res://scripts/CORAttackArc.gd")
 const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
 const EXEJetEffect    = preload("res://scripts/EXEJetEffect.gd")
 const EXEImpactArc    = preload("res://scripts/EXEImpactArc.gd")
+const EXEImpactArcHit = preload("res://scripts/EXEImpactArcHit.gd")
 
 var character_name: String = "COR"
 var character_color: Color = Color(0.2, 0.4, 0.9)
@@ -197,18 +198,17 @@ func _attack_EXE(dir: int, success: bool, _is_dash: bool) -> void:
 		get_parent().add_child(jet1))
 
 
-	# 未擊破：衝到最遠點時放出橘色衝擊弧
-	if not success:
-		var arc_delay := pre_delay + dash_dur
-		var arc_pos   := origin + dv * lunge_dist
-		var tw_arc := create_tween()
-		tw_arc.tween_interval(arc_delay)
-		tw_arc.tween_callback(func():
-			var arc := Node2D.new()
-			arc.set_script(EXEImpactArc)
-			arc.set("dir_vec", dv)
-			arc.position = arc_pos
-			get_parent().add_child(arc))
+	# 衝到最遠點時放出橘色衝擊弧
+	var arc_delay := pre_delay + dash_dur
+	var arc_pos   := origin + dv * lunge_dist
+	var tw_arc := create_tween()
+	tw_arc.tween_interval(arc_delay)
+	tw_arc.tween_callback(func():
+		var arc := Node2D.new()
+		arc.set_script(EXEImpactArcHit if success else EXEImpactArc)
+		arc.set("dir_vec", dv)
+		arc.position = arc_pos
+		get_parent().add_child(arc))
 
 	# 位移：後退 → 停頓 → 衝出（越過格碰到敵人）→ 回歸
 	var tw := create_tween()
