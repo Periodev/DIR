@@ -3,8 +3,8 @@ extends Node2D
 const COLOR       := Color(0.2, 0.4, 0.9)   # COR 角色色
 const MIN_RADIUS  :=  5.0
 const MAX_RADIUS  := 65.0                    # 略超出格子半徑(50)
-const RING_WIDTH  :=  3.0
-const GLOW_WIDTH  :=  8.0
+const RING_WIDTH  :=  8.0
+const GLOW_WIDTH  := 22.0
 
 # 設為 true（add_child 之前）產生三環弱波紋
 var weak: bool = false

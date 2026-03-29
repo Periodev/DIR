@@ -1,11 +1,11 @@
 extends Node2D
 
 const COLOR      := Color(0.2, 0.4, 0.9)
-const ARC_WIDTH  :=  2.5
-const GLOW_WIDTH :=  7.0
+const ARC_WIDTH  :=  8.0
+const GLOW_WIDTH := 22.0
 const MIN_R      := 18.0
 const MAX_R      := 85.0
-const SPREAD     := PI * 0.22   # ±40°，約 80° 弧寬
+const SPREAD     := PI / 6.0    # ±30°，約 60° 弧寬
 
 var dir_vec: Vector2 = Vector2.UP   # add_child 前設定
 var arc1_t: float = 0.0
@@ -46,6 +46,6 @@ func _draw_arc(t: float) -> void:
 	var alpha := 1.0 - t
 	var a0    := dir_vec.angle()
 	draw_arc(Vector2.ZERO, r, a0 - SPREAD, a0 + SPREAD, 32,
-	         Color(COLOR.r, COLOR.g, COLOR.b, alpha * 0.18), GLOW_WIDTH)
+	         Color(COLOR.r, COLOR.g, COLOR.b, alpha), GLOW_WIDTH)
 	draw_arc(Vector2.ZERO, r, a0 - SPREAD, a0 + SPREAD, 32,
-	         Color(COLOR.r, COLOR.g, COLOR.b, alpha * 0.85), ARC_WIDTH)
+	         Color(COLOR.r, COLOR.g, COLOR.b, alpha), ARC_WIDTH)
