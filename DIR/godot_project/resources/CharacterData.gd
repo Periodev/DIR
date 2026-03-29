@@ -42,7 +42,7 @@ const CHARACTERS := {
 		"has_pierce": true,
 		"has_penetrating_attack": false,
 		"has_post_kill_reposition": false,
-		"color":     Color(0.9, 0.2, 0.2),
+		"color":     Color(0.95, 0.40, 0.05),
 		"shape":     "diamond",
 	},
 	"COR": {
