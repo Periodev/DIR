@@ -2,7 +2,7 @@ extends Node2D
 
 const COLOR      := Color(0.2, 0.4, 0.9)
 const ARC_WIDTH  :=  8.0
-const GLOW_WIDTH := 22.0
+const GLOW_WIDTH := 32.0
 const MIN_R      := 18.0
 const MAX_R      := 85.0
 const SPREAD     := PI / 6.0    # ±30°，約 60° 弧寬
@@ -16,7 +16,7 @@ func _ready() -> void:
 	z_index = 7   # CORRippleEffect(6) 之上，Player(10) 之下
 
 	var tw1 := create_tween()
-	tw1.tween_method(_set_a1, 0.0, 1.0, 0.18)\
+	tw1.tween_method(_set_a1, 0.0, 1.0, 0.25)\
 	   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 	#var tw2 := create_tween()

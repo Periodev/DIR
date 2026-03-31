@@ -5,7 +5,7 @@ const MAX_R      := 62.0
 const MIN_R      :=  8.0
 const RING_WIDTH :=  7.0
 const GLOW_WIDTH := 20.0
-const RING_DUR   :=  0.16
+const RING_DUR   :=  0.14   # 收縮 0.06+0.14=0.20s 完成
 const STAGGER    :=  0.06
 
 var ring1_t: float = 0.0

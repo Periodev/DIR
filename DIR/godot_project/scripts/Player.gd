@@ -5,7 +5,7 @@ const PLNMoveTrail    = preload("res://scripts/PLNMoveTrail.gd")
 const CORAttackArc    = preload("res://scripts/CORAttackArc.gd")
 const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
 const CORChargeRipple = preload("res://scripts/CORChargeRipple.gd")
-const COR_CHARGE_DUR  := 0.15
+const COR_CHARGE_DUR  := 0.30   # 回波 0.20s + 停頓 0.10s
 const EXEJetEffect    = preload("res://scripts/EXEJetEffect.gd")
 const EXEImpactArc    = preload("res://scripts/EXEImpactArc.gd")
 const EXEImpactArcHit = preload("res://scripts/EXEImpactArcHit.gd")
@@ -173,7 +173,13 @@ func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 			fx.set("dir_vec", Vector2(dv))
 			fx.position = origin
 			get_parent().add_child(fx)
-			_attack_generic(dir, success))
+			var lunge_dist: float = 30.0 if success else 12.0
+			var tip := origin + Vector2(dv) * lunge_dist
+			var tw2 := create_tween()
+			tw2.tween_property(self, "position", tip, 0.05)\
+			   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+			tw2.tween_property(self, "position", origin, 0.12)\
+			   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT))
 
 func _attack_PLN(dir: int, success: bool, is_dash: bool) -> void:
 	if is_dash:
@@ -255,7 +261,7 @@ func get_hit_delay(is_dash: bool = false) -> float:
 	match character_name:
 		"EXE": return 0.22         # pull(0.01) + pause(0.15) + dash(0.06)
 		"PLN": return 0.16         # windup(0.13) + tip_extend(0.03)
-		"COR": return COR_CHARGE_DUR + (0.15 if is_dash else 0.08)
+		"COR": return COR_CHARGE_DUR + (0.15 if is_dash else 0.05)
 		_:     return 0.08         # GRD 及其他，generic out_dur
 
 func _facing_to_angle(dir: int) -> float:
