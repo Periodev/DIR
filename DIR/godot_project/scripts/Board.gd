@@ -6,7 +6,7 @@ const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
 const COLS := 5
 const ROWS := 5
 const SPAWN_CYCLE_STEPS := 3
-const SPAWNS_PER_CYCLE := 2
+const SPAWNS_PER_CYCLE := 1
 const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD
 const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
@@ -159,8 +159,15 @@ func try_move(dir: int) -> bool:
 		inventory.remove_at(match_idx)
 		player_facing_dir = dir
 		if _try_break_one_way_shield(target, dir, target_type):
-			cell_nodes[target.y][target.x].flash_shield_break(0.17)
-			player_node.play_attack(dir, false, _get_attack_mode() == CharacterData.AttackMode.DASH)
+			var _is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
+			var _delay: float = player_node.get_hit_delay(_is_dash)
+			_pending_kill_visual.append(target)
+			get_tree().create_timer(_delay).timeout.connect(func():
+				_pending_kill_visual.erase(target)
+				cell_nodes[target.y][target.x].set_type(CharacterData.CellType.DEAD)
+				cell_nodes[target.y][target.x].set_shield_dir(CharacterData.Direction.NONE)
+				cell_nodes[target.y][target.x].flash_shield_break(0.17))
+			player_node.play_attack(dir, false, _is_dash)
 			return _finalize_turn_after_action()
 		if _has_penetrating_attack():
 			_resolve_penetrating_attack(dir, origin, target, target_type)
@@ -225,8 +232,15 @@ func try_charge_action() -> bool:
 	else:
 		var pos_before_attack := player_pos
 		if _try_break_one_way_shield(target, dir, target_type):
-			cell_nodes[target.y][target.x].flash_shield_break(0.17)
-			player_node.play_attack(dir, false, _get_attack_mode() == CharacterData.AttackMode.DASH)
+			var _is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
+			var _delay: float = player_node.get_hit_delay(_is_dash)
+			_pending_kill_visual.append(target)
+			get_tree().create_timer(_delay).timeout.connect(func():
+				_pending_kill_visual.erase(target)
+				cell_nodes[target.y][target.x].set_type(CharacterData.CellType.DEAD)
+				cell_nodes[target.y][target.x].set_shield_dir(CharacterData.Direction.NONE)
+				cell_nodes[target.y][target.x].flash_shield_break(0.17))
+			player_node.play_attack(dir, false, _is_dash)
 			return _finalize_turn_after_action()
 		if _get_attack_mode() == CharacterData.AttackMode.DASH:
 			_resolve_attack(dir, target, target_type)
@@ -473,10 +487,11 @@ func _on_failed_kill(attack_dir: int) -> void:
 		var player_vpos := Vector2(player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
 								   player_pos.y * CELL_STEP + CELL_SIZE / 2.0)
 		var stall_pos := player_vpos + Vector2(CharacterData.DIR_VECTOR[attack_dir]) * 60.0
-		_spawn_cor_ripple_weak(stall_pos)
+		var is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
+		_spawn_cor_ripple_weak(stall_pos, player_node.get_hit_delay(is_dash))
 
-func _spawn_cor_ripple_weak(world_pos: Vector2) -> void:
-	get_tree().create_timer(0.14).timeout.connect(func() -> void:
+func _spawn_cor_ripple_weak(world_pos: Vector2, delay: float) -> void:
+	get_tree().create_timer(delay).timeout.connect(func() -> void:
 		var fx := Node2D.new()
 		fx.set_script(CORRippleEffect)
 		fx.set("weak", true)

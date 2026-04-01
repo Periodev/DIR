@@ -200,8 +200,8 @@ func _attack_EXE(dir: int, success: bool, _is_dash: bool) -> void:
 	var pause_dur := 0.15                          # 停頓
 	var dash_dur  := 0.06 if success else 0.04    # 衝出
 	var back_dur  := 0.10 if success else 0.07    # 回歸
-	var pull_dist := 10.0                          # 後退距離
-	var lunge_dist := 75.0 if success else 55.0   # 衝出距離（接近/抵達敵人）
+	var pull_dist := 6.0                          # 後退距離
+	var lunge_dist := 60.0 if success else 50.0   # 衝出距離（接近/抵達敵人）
 	var pre_delay := pull_dur + pause_dur
 
 	# 衝出瞬間的強力 jet（後方噴射，最長主線，滿副線）
