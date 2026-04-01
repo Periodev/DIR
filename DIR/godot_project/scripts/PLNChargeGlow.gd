@@ -2,6 +2,7 @@ extends Node2D
 
 const CORE_COLOR := Color(0.55, 1.0, 0.40, 1.0)
 const HALO_COLOR := Color(0.40, 1.0, 0.35, 0.52)
+const FRONT_COLOR := Color(0.74, 1.0, 0.58, 0.82)
 const CORE_WIDTH := 3.0
 const HALO_WIDTH := 8.0
 
@@ -50,18 +51,33 @@ func _draw() -> void:
 	var tip_dir: Vector2 = Vector2.UP.rotated(_angle)
 	var tip: Vector2 = tip_dir * (35.0 * _scale_mul)
 	var perp: Vector2 = tip_dir.rotated(PI * 0.5)
-	var front_weight: float = clampf((_progress - 0.18) / 0.82, 0.0, 1.0)
+	var front_weight: float = clampf((_progress - 0.10) / 0.90, 0.0, 1.0)
 	if front_weight > 0.0:
-		var start_center: Vector2 = tip_dir * lerpf(-6.0, 6.0, front_weight)
-		var side_span: float = lerpf(34.0, 10.0, front_weight)
-		var beam_len: float = lerpf(22.0, 12.0, front_weight)
+		var start_center: Vector2 = tip_dir * lerpf(-14.0, 10.0, front_weight)
+		var side_span: float = lerpf(44.0, 7.0, front_weight)
+		var beam_len: float = lerpf(32.0, 9.0, front_weight)
 		var beam: PackedVector2Array = PackedVector2Array([
 			start_center + perp * side_span,
 			tip - tip_dir * beam_len,
 			start_center - perp * side_span,
 		])
-		draw_colored_polygon(beam, Color(HALO_COLOR.r, HALO_COLOR.g, HALO_COLOR.b, 0.28 * _alpha * front_weight))
-		draw_polyline(beam + PackedVector2Array([beam[0]]), Color(CORE_COLOR.r, CORE_COLOR.g, CORE_COLOR.b, 0.65 * _alpha * front_weight), 2.2)
+		var beam_alpha: float = 0.34 * _alpha * front_weight
+		draw_colored_polygon(beam, Color(HALO_COLOR.r, HALO_COLOR.g, HALO_COLOR.b, beam_alpha))
+		draw_polyline(beam + PackedVector2Array([beam[0]]), Color(CORE_COLOR.r, CORE_COLOR.g, CORE_COLOR.b, 0.78 * _alpha * front_weight), 2.6)
+
+	var converge_weight: float = clampf((_progress - 0.52) / 0.48, 0.0, 1.0)
+	if converge_weight > 0.0:
+		var tri_tip: Vector2 = tip + tip_dir * lerpf(4.0, 10.0, converge_weight)
+		var tri_back: Vector2 = tip - tip_dir * lerpf(20.0, 6.0, converge_weight)
+		var tri_half_width: float = lerpf(26.0, 5.5, converge_weight)
+		var tri: PackedVector2Array = PackedVector2Array([
+			tri_tip,
+			tri_back + perp * tri_half_width,
+			tri_back - perp * tri_half_width,
+		])
+		var tri_alpha: float = _alpha * lerpf(0.26, 0.92, converge_weight)
+		draw_colored_polygon(tri, Color(FRONT_COLOR.r, FRONT_COLOR.g, FRONT_COLOR.b, tri_alpha))
+		draw_polyline(tri + PackedVector2Array([tri[0]]), Color(1.0, 1.0, 0.92, tri_alpha), 2.0)
 
 func _make_blade_points(scale_mul: float) -> PackedVector2Array:
 	var base: PackedVector2Array = PackedVector2Array([
