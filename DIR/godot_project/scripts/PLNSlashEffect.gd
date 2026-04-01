@@ -3,7 +3,6 @@ extends Node2D
 var dir_vec: Vector2 = Vector2.ZERO
 var slash_extent: float = 0.0  # 0..1  — tip travel distance
 var slash_alpha:  float = 0.0  # 0..1  — opacity (independent of extent)
-var spark_t:      float = 0.0
 
 const SLASH_LEN       := 160.0  # full — tip passes through enemy
 const SLASH_LEN_SHORT := 120.0  # short — tip slightly overlaps enemy cell
@@ -12,10 +11,8 @@ const MAX_WIDTH       :=   7.0
 const MAX_WIDTH_SHORT :=   6.0  # slightly thinner for the blocked version
 const GLOW_WIDTH      :=  9.0
 const SCAR_STEPS      :=  12
-const SPARK_SPREAD    := 14.0
-const SPARK_LEN       :=  9.0
 const SLASH_COLOR     := Color(0.15, 1.0, 0.55)
-const WINDUP          := 0.13
+const WINDUP          := 0.22
 
 var _slash_len: float  = SLASH_LEN
 var _max_width: float  = MAX_WIDTH
@@ -47,13 +44,6 @@ func setup(dv: Vector2, short: bool = false, windup_override: float = -1.0, no_s
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw_a.tween_callback(queue_free)
 
-	# Sparks trigger when tip arrives
-	if not no_sparks:
-		var tw_sp := create_tween()
-		tw_sp.tween_interval(actual_windup + 0.03)
-		tw_sp.tween_method(_set_spark, 0.0, 1.0, 0.18)\
-			 .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-
 func _set_extent(t: float) -> void:
 	slash_extent = t
 	queue_redraw()
@@ -62,26 +52,11 @@ func _set_alpha(t: float) -> void:
 	slash_alpha = t
 	queue_redraw()
 
-func _set_spark(t: float) -> void:
-	spark_t = t
-	queue_redraw()
-
 func _draw() -> void:
 	if slash_alpha > 0.0:
 		var tail := dir_vec * -BEHIND_LEN
 		var tip  := dir_vec * (slash_extent * _slash_len)
 		_draw_scar(tail, tip, slash_alpha)
-
-	if spark_t > 0.0:
-		var impact     := dir_vec * _slash_len
-		var spark_alpha := 1.0 - spark_t
-		if spark_alpha > 0.0:
-			var angles := [-PI / 6.0, PI / 6.0, -PI / 3.0, PI / 3.0, 0.0]
-			for a in angles:
-				var sd    := dir_vec.rotated(a)
-				var start := impact
-				var end   := impact + sd * (spark_t * SPARK_SPREAD + SPARK_LEN * 0.5)
-				draw_line(start, end, Color(SLASH_COLOR.r, SLASH_COLOR.g, SLASH_COLOR.b, spark_alpha), 1.5)
 
 # Draws a lens/spindle polygon along [tail → tip].
 # Width profile is a sin curve — zero at both ends, MAX_WIDTH at centre.

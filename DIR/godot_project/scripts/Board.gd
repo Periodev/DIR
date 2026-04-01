@@ -7,7 +7,7 @@ const COLS := 5
 const ROWS := 5
 const SPAWN_CYCLE_STEPS := 3
 const SPAWNS_PER_CYCLE := 1
-const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD
+const SPAWN_CELL_TYPE := CharacterData.CellType.DEAD_ONE_WAY_SHIELD
 const BLOCK_OUTER_RING_SPAWN := false
 const CELL_SIZE := 100.0
 const CELL_GAP := 8.0
@@ -124,6 +124,11 @@ func restart() -> void:
 
 	_refresh_visuals()
 
+func debug_preview_charge() -> void:
+	if current_character != "PLN":
+		return
+	player_node.play_attack(player_facing_dir, true, true)
+
 func try_move(dir: int) -> bool:
 	if not game_state.is_idle():
 		return false
@@ -178,8 +183,9 @@ func try_move(dir: int) -> bool:
 				if _has_post_kill_reposition():
 					_pln_pending_kill_pos = target
 					_pln_defer_player_move = true
+					player_node.play_pln_charge_glow(dir)
 					# Spawn slash immediately at origin (normal windup rhythm)
-					var slash_fx := Node2D.new()
+					var slash_fx: Node2D = Node2D.new()
 					slash_fx.set_script(PLNSlashEffect)
 					slash_fx.position = Vector2(
 						origin.x * CELL_STEP + CELL_SIZE / 2.0,

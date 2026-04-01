@@ -1,6 +1,7 @@
 extends Node2D
 
 const PLNSlashEffect  = preload("res://scripts/PLNSlashEffect.gd")
+const PLNChargeGlow   = preload("res://scripts/PLNChargeGlow.gd")
 const PLNMoveTrail    = preload("res://scripts/PLNMoveTrail.gd")
 const CORAttackArc    = preload("res://scripts/CORAttackArc.gd")
 const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
@@ -183,13 +184,22 @@ func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 
 func _attack_PLN(dir: int, success: bool, is_dash: bool) -> void:
 	if is_dash:
-		var dv := Vector2(CharacterData.DIR_VECTOR[dir])
-		var fx := Node2D.new()
+		play_pln_charge_glow(dir)
+		var dv: Vector2 = Vector2(CharacterData.DIR_VECTOR[dir])
+		var fx: Node2D = Node2D.new()
 		fx.set_script(PLNSlashEffect)
 		add_child(fx)
 		fx.setup(dv, not success)   # short=true when blocked
 	else:
 		_attack_generic(dir, success)
+
+func play_pln_charge_glow(dir: int) -> void:
+	if character_name != "PLN":
+		return
+	var glow: Node2D = Node2D.new()
+	glow.set_script(PLNChargeGlow)
+	add_child(glow)
+	glow.setup(dir, PLNSlashEffect.WINDUP)
 
 func _attack_EXE(dir: int, success: bool, _is_dash: bool) -> void:
 	var dv := Vector2(CharacterData.DIR_VECTOR[dir])
@@ -260,7 +270,7 @@ func _attack_generic(dir: int, success: bool) -> void:
 func get_hit_delay(is_dash: bool = false) -> float:
 	match character_name:
 		"EXE": return 0.22         # pull(0.01) + pause(0.15) + dash(0.06)
-		"PLN": return 0.16         # windup(0.13) + tip_extend(0.03)
+		"PLN": return 0.25         # windup(0.22) + tip_extend(0.03)
 		"COR": return COR_CHARGE_DUR + (0.15 if is_dash else 0.05)
 		_:     return 0.08         # GRD 及其他，generic out_dur
 

@@ -43,6 +43,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	# Debug: preview PLN charge visual (F6)
+	if keycode == KEY_F6:
+		board.debug_preview_charge()
+		get_viewport().set_input_as_handled()
+		return
+
 	if board.game_state.is_game_over():
 		return
 
