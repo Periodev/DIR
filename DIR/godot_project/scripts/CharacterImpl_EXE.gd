@@ -34,7 +34,7 @@ func play_move(player: Node2D, from_pos: Vector2, to_pos: Vector2) -> void:
 	   .set_trans(Tween.TRANS_LINEAR)
 
 func play_attack(player: Node2D, dir: int, success: bool, _is_dash: bool) -> void:
-	var dv := Vector2(CharacterData.DIR_VECTOR[dir])
+	var dv: Vector2 = Vector2(CharacterData.DIR_VECTOR[dir])
 	var origin := player.position
 
 	# 時間軸

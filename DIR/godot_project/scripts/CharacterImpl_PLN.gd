@@ -60,7 +60,7 @@ func begin_kill_anim(board: Node2D, origin: Vector2i, target: Vector2i, dir: int
 	pending_kill_pos = target
 	defer_player_move = true
 	board.player_node.play_pln_charge_glow(dir)
-	var dv := CharacterData.DIR_VECTOR[dir]
+	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var slash_fx: Node2D = Node2D.new()
 	slash_fx.set_script(PLNSlashEffect)
 	slash_fx.position = Vector2(
@@ -76,7 +76,7 @@ func trigger_move(board: Node2D) -> void:
 	if not defer_player_move:
 		return
 	defer_player_move = false
-	var from_pos := board.player_node.position
+	var from_pos: Vector2 = board.player_node.position
 	var to_pos := Vector2(
 		board.player_pos.x * board.CELL_STEP + board.CELL_SIZE / 2.0,
 		board.player_pos.y * board.CELL_STEP + board.CELL_SIZE / 2.0

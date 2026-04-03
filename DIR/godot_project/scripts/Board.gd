@@ -32,7 +32,6 @@ var cycle_counter: int = 0
 var freeze_steps: int = 0
 var _suppress_hit_effect_once: bool = false
 var _pending_kill_visual: Array[Vector2i] = []  # 正在等待延遲視覺更新的格子
-var _presenting_animation: bool = false
 var survival_turns: int = 0
 
 var inventory: Inventory
@@ -114,7 +113,6 @@ func restart() -> void:
 	freeze_steps = 0
 	_suppress_hit_effect_once = false
 	_pending_kill_visual.clear()
-	_presenting_animation = false
 	survival_turns = 0
 
 	setup_character(current_character, current_attack_mode_override)
@@ -126,7 +124,7 @@ func restart() -> void:
 func debug_preview_charge() -> void:
 	if current_character != "PLN":
 		return
-	_presenting_animation = true
+	game_state.set_state(CharacterData.GameStateEnum.PRESENTING)
 	player_node.play_attack(player_facing_dir, true, true)
 
 func try_move(dir: int) -> bool:
@@ -166,7 +164,7 @@ func try_move(dir: int) -> bool:
 		if _try_break_one_way_shield(target, dir, target_type):
 			var _is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
 			_pending_kill_visual.append(target)
-			_presenting_animation = true
+			game_state.set_state(CharacterData.GameStateEnum.PRESENTING)
 			player_node.play_attack(dir, false, _is_dash)
 			player_node.animation_done.connect(func():
 				_pending_kill_visual.erase(target)
@@ -181,11 +179,11 @@ func try_move(dir: int) -> bool:
 				player_pos = target
 				if _has_post_kill_reposition():
 					_char_impl.begin_kill_anim(self, origin, target, dir)
-					_presenting_animation = true
+					game_state.set_state(CharacterData.GameStateEnum.PRESENTING)
 					player_node.emit_animation_done_after(player_node.get_hit_delay(true))
 				else:
 					inventory.register_move(dir)
-					_presenting_animation = true
+					game_state.set_state(CharacterData.GameStateEnum.PRESENTING)
 					player_node.play_attack(dir, true, true)
 		else:
 			_resolve_attack(dir, target, target_type)
@@ -193,7 +191,7 @@ func try_move(dir: int) -> bool:
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
 			var was_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
 			if _char_impl.pending_kill_pos == Vector2i(-1, -1):
-				_presenting_animation = true
+				game_state.set_state(CharacterData.GameStateEnum.PRESENTING)
 				player_node.play_attack(dir, attack_hit, was_dash)
 
 		if _begin_post_kill_reposition_if_needed(target, dir):
@@ -230,7 +228,7 @@ func try_charge_action() -> bool:
 		if _try_break_one_way_shield(target, dir, target_type):
 			var _is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
 			_pending_kill_visual.append(target)
-			_presenting_animation = true
+			game_state.set_state(CharacterData.GameStateEnum.PRESENTING)
 			player_node.play_attack(dir, false, _is_dash)
 			player_node.animation_done.connect(func():
 				_pending_kill_visual.erase(target)
@@ -248,7 +246,7 @@ func try_charge_action() -> bool:
 		if player_pos == pos_before_attack:
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
 			var was_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
-			_presenting_animation = true
+			game_state.set_state(CharacterData.GameStateEnum.PRESENTING)
 			player_node.play_attack(dir, attack_hit, was_dash)
 	return _finalize_turn_after_action()
 
@@ -287,10 +285,11 @@ func try_bonus_move(dir: int) -> bool:
 		if target_type != CharacterData.CellType.LIVE:
 			_resolve_attack(dir, target, target_type)
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
-			_presenting_animation = true
+			game_state.set_state(CharacterData.GameStateEnum.PRESENTING)
 			player_node.play_attack(dir, attack_hit)
 			_did_bonus_attack = true
-		game_state.set_state(CharacterData.GameStateEnum.PRESENTING if _did_bonus_attack else CharacterData.GameStateEnum.IDLE)
+		if not _did_bonus_attack:
+			game_state.set_state(CharacterData.GameStateEnum.IDLE)
 		_refresh_visuals()
 		_check_game_over()
 		return true
@@ -431,7 +430,6 @@ func _begin_post_kill_reposition_if_needed(target: Vector2i, entry_dir: int) -> 
 
 func _finalize_turn_after_action() -> bool:
 	survival_turns += 1
-	game_state.set_state(CharacterData.GameStateEnum.GENERATING)
 	_advance_cycle()
 	_refresh_visuals()
 	_check_game_over()
@@ -469,7 +467,6 @@ func _spawn_hit_effect(pos: Vector2i) -> void:
 	, CONNECT_ONE_SHOT)
 
 func _on_player_animation_done() -> void:
-	_presenting_animation = false
 	if game_state.current_state == CharacterData.GameStateEnum.PRESENTING:
 		game_state.set_state(CharacterData.GameStateEnum.IDLE)
 
@@ -550,8 +547,8 @@ func _advance_cycle() -> void:
 		cycle_counter = 0
 		cycle_resolved = false
 
-	var _next_state := CharacterData.GameStateEnum.PRESENTING if _presenting_animation else CharacterData.GameStateEnum.IDLE
-	game_state.set_state(_next_state)
+	if not game_state.is_presenting():
+		game_state.set_state(CharacterData.GameStateEnum.IDLE)
 
 func _start_new_cycle() -> void:
 	candidate_cells.clear()
