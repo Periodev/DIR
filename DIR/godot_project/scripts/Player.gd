@@ -2,28 +2,25 @@ extends Node2D
 
 signal animation_done
 
-const PLNSlashEffect  = preload("res://scripts/PLNSlashEffect.gd")
-const PLNChargeGlow   = preload("res://scripts/PLNChargeGlow.gd")
-const PLNMoveTrail    = preload("res://scripts/PLNMoveTrail.gd")
-const CORAttackArc    = preload("res://scripts/CORAttackArc.gd")
-const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
-const CORChargeRipple = preload("res://scripts/CORChargeRipple.gd")
-const COR_CHARGE_DUR  := 0.30   # 回波 0.20s + 停頓 0.10s
-const EXEJetEffect    = preload("res://scripts/EXEJetEffect.gd")
-const EXEImpactArc    = preload("res://scripts/EXEImpactArc.gd")
-const EXEImpactArcHit = preload("res://scripts/EXEImpactArcHit.gd")
+const CharacterImpl_EXE = preload("res://scripts/CharacterImpl_EXE.gd")
+const CharacterImpl_COR = preload("res://scripts/CharacterImpl_COR.gd")
+const CharacterImpl_PLN = preload("res://scripts/CharacterImpl_PLN.gd")
 
 var character_name: String = "COR"
 var character_color: Color = Color(0.2, 0.4, 0.9)
 var character_shape: String = "hexagon"
 var facing_dir: int = CharacterData.Direction.UP
-var _pending_penetration: bool = false
+var _char_impl  # CharacterImpl_EXE / CharacterImpl_COR / CharacterImpl_PLN
 
 func set_character(char_name: String) -> void:
 	character_name = char_name
 	var data = CharacterData.CHARACTERS[char_name]
 	character_color = data["color"]
 	character_shape = data["shape"]
+	match char_name:
+		"EXE": _char_impl = CharacterImpl_EXE.new()
+		"COR": _char_impl = CharacterImpl_COR.new()
+		"PLN": _char_impl = CharacterImpl_PLN.new()
 	queue_redraw()
 
 func set_facing(dir: int) -> void:
@@ -79,207 +76,21 @@ func _draw() -> void:
 func play_move(from_pos: Vector2) -> void:
 	var to_pos := position          # already set by Board
 	position = from_pos             # snap back to start
-	match character_name:
-		"EXE":
-			# [1] Anticipation 0.05s — coil: compress scale, hold position
-			# [2] Lock         0.02s — freeze before release
-			# [3] Dash         0.08s — EASE_IN burst, no deform, heavy object launched
-			# [4] Hard stop    0.02s — single minimal settle, nearly no bounce
-			var dir := (to_pos - from_pos).normalized()
-			var jet := Node2D.new()
-			jet.set_script(EXEJetEffect)
-			jet.set("dir_vec", -dir)
-			jet.position = from_pos
-			get_parent().add_child(jet)
-			var tw := create_tween()
-			tw.tween_interval(0.04)
-			tw.tween_property(self, "position", to_pos, 0.07)\
-			  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
-			tw.tween_property(self, "position", to_pos + dir * 3.0, 0.01)\
-			  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-			tw.tween_property(self, "position", to_pos, 0.01)\
-			  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-			var tw2 := create_tween()
-			tw2.tween_property(self, "scale", Vector2(0.88, 0.85), 0.05)\
-			   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-			tw2.tween_interval(0.02)
-			tw2.tween_property(self, "scale", Vector2(1.0, 1.0), 0.02)\
-			   .set_trans(Tween.TRANS_LINEAR)
-		"PLN":
-			var trail := Node2D.new()
-			trail.set_script(PLNMoveTrail)
-			get_parent().add_child(trail)
-			trail.setup(from_pos, to_pos)
-			var tw := create_tween()
-			tw.tween_property(self, "position", to_pos, 0.07)\
-			  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-		_:  # COR, GRD, and others
-			if character_name == "COR":
-				var fx := Node2D.new()
-				fx.set_script(CORRippleEffect)
-				fx.set("single", true)
-				fx.position = from_pos
-				get_parent().add_child(fx)
-			if character_name == "COR" and _pending_penetration:
-				_pending_penetration = false
-				# 滲透曲線：蓄力停頓 → 快速接近 → 半重疊前阻尼減速 → 推過後順滑完成
-				var resist := from_pos + (to_pos - from_pos) * 0.58
-				var tw := create_tween()
-				tw.tween_interval(COR_CHARGE_DUR)
-				tw.tween_property(self, "position", resist, 0.15)\
-				  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-				tw.tween_interval(0.09)
-				tw.tween_property(self, "position", to_pos, 0.09)\
-				  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-			else:
-				var tw := create_tween()
-				tw.tween_property(self, "position", to_pos, 0.12)\
-				  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_char_impl.play_move(self, from_pos, to_pos)
 
 func play_attack(dir: int, success: bool, is_dash: bool = false) -> void:
-	match character_name:
-		"COR": _attack_COR(dir, success, is_dash)
-		"PLN": _attack_PLN(dir, success, is_dash)
-		"EXE": _attack_EXE(dir, success, is_dash)
-		"GRD": _attack_GRD(dir, success, is_dash)
-		_:     _attack_generic(dir, success)
+	_char_impl.play_attack(self, dir, success, is_dash)
 	emit_animation_done_after(get_hit_delay(is_dash))
 
 func emit_animation_done_after(delay: float) -> void:
 	get_tree().create_timer(delay).timeout.connect(
 		func(): animation_done.emit(), CONNECT_ONE_SHOT)
 
-func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
-	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
-	var origin := position
-
-	# 蓄力波紋（所有攻擊共用）
-	var charge_fx := Node2D.new()
-	charge_fx.set_script(CORChargeRipple)
-	charge_fx.position = origin
-	get_parent().add_child(charge_fx)
-
-	if is_dash and success:
-		_pending_penetration = true  # play_move 用滲透曲線（內含 COR_CHARGE_DUR 延遲）
-	elif is_dash and not success:
-		# 滲透失敗：停頓後壓入被擋，彈回
-		var tip := origin + Vector2(dv) * 60.0
-		var tw := create_tween()
-		tw.tween_interval(COR_CHARGE_DUR)
-		tw.tween_property(self, "position", tip, 0.14)\
-		  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_OUT)
-		tw.tween_interval(0.20)
-		tw.tween_property(self, "position", origin, 0.15)\
-		  .set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-	else:
-		# STRIKE：停頓後放弧 + 點刺
-		var tw_delay := create_tween()
-		tw_delay.tween_interval(COR_CHARGE_DUR)
-		tw_delay.tween_callback(func():
-			var fx := Node2D.new()
-			fx.set_script(CORAttackArc)
-			fx.set("dir_vec", Vector2(dv))
-			fx.position = origin
-			get_parent().add_child(fx)
-			var lunge_dist: float = 30.0 if success else 12.0
-			var tip := origin + Vector2(dv) * lunge_dist
-			var tw2 := create_tween()
-			tw2.tween_property(self, "position", tip, 0.05)\
-			   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-			tw2.tween_property(self, "position", origin, 0.12)\
-			   .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT))
-
-func _attack_PLN(dir: int, success: bool, is_dash: bool) -> void:
-	if is_dash:
-		play_pln_charge_glow(dir)
-		var dv: Vector2 = Vector2(CharacterData.DIR_VECTOR[dir])
-		var fx: Node2D = Node2D.new()
-		fx.set_script(PLNSlashEffect)
-		add_child(fx)
-		fx.setup(dv, not success)   # short=true when blocked
-	else:
-		_attack_generic(dir, success)
-
 func play_pln_charge_glow(dir: int) -> void:
-	if character_name != "PLN":
-		return
-	var glow: Node2D = Node2D.new()
-	glow.set_script(PLNChargeGlow)
-	add_child(glow)
-	glow.setup(dir, PLNSlashEffect.WINDUP)
-
-func _attack_EXE(dir: int, success: bool, _is_dash: bool) -> void:
-	var dv := Vector2(CharacterData.DIR_VECTOR[dir])
-	var origin := position
-
-	# 時間軸
-	var pull_dur  := 0.01                          # 後退
-	var pause_dur := 0.15                          # 停頓
-	var dash_dur  := 0.06 if success else 0.04    # 衝出
-	var back_dur  := 0.10 if success else 0.07    # 回歸
-	var pull_dist := 6.0                          # 後退距離
-	var lunge_dist := 60.0 if success else 50.0   # 衝出距離（接近/抵達敵人）
-	var pre_delay := pull_dur + pause_dur
-
-	# 衝出瞬間的強力 jet（後方噴射，最長主線，滿副線）
-	var jet1 := Node2D.new()
-	jet1.set_script(EXEJetEffect)
-	jet1.set("dir_vec", -dv)
-	jet1.set("force_main_idx", 2)
-	jet1.set("use_attack_pool", true)
-	jet1.set("time_scale", 1.2)
-	var tw_j1 := create_tween()
-	tw_j1.tween_interval(pre_delay)
-	tw_j1.tween_callback(func():
-		jet1.position = origin - dv * pull_dist
-		get_parent().add_child(jet1))
-
-
-	# 衝到最遠點時放出橘色衝擊弧
-	var arc_delay := pre_delay + dash_dur
-	var arc_pos   := origin + dv * lunge_dist
-	var tw_arc := create_tween()
-	tw_arc.tween_interval(arc_delay)
-	tw_arc.tween_callback(func():
-		var arc := Node2D.new()
-		arc.set_script(EXEImpactArcHit if success else EXEImpactArc)
-		arc.set("dir_vec", dv)
-		arc.position = arc_pos
-		get_parent().add_child(arc))
-
-	# 位移：後退 → 停頓 → 衝出（越過格碰到敵人）→ 回歸
-	var tw := create_tween()
-	tw.tween_property(self, "position", origin - dv * pull_dist, pull_dur)\
-	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_interval(pause_dur)
-	tw.tween_property(self, "position", origin + dv * lunge_dist, dash_dur)\
-	  .set_trans(Tween.TRANS_EXPO).set_ease(Tween.EASE_IN)
-	tw.tween_interval(0.25)  # 撞擊停頓
-	tw.tween_property(self, "position", origin, back_dur)\
-	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-
-func _attack_GRD(dir: int, success: bool, _is_dash: bool) -> void:
-	_attack_generic(dir, success)
-
-func _attack_generic(dir: int, success: bool) -> void:
-	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
-	var origin := position
-	var lunge_dist: float = 30.0 if success else 12.0
-	var out_dur: float    = 0.08 if success else 0.05
-	var back_dur: float   = 0.12 if success else 0.10
-	var tip := origin + Vector2(dv) * lunge_dist
-	var tw := create_tween()
-	tw.tween_property(self, "position", tip, out_dur)\
-	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	tw.tween_property(self, "position", origin, back_dur)\
-	  .set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	_char_impl.play_charge_preview(self, dir)
 
 func get_hit_delay(is_dash: bool = false) -> float:
-	match character_name:
-		"EXE": return 0.22         # pull(0.01) + pause(0.15) + dash(0.06)
-		"PLN": return 0.25         # windup(0.22) + tip_extend(0.03)
-		"COR": return COR_CHARGE_DUR + (0.15 if is_dash else 0.05)
-		_:     return 0.08         # GRD 及其他，generic out_dur
+	return _char_impl.get_hit_delay(is_dash)
 
 func _facing_to_angle(dir: int) -> float:
 	match dir:

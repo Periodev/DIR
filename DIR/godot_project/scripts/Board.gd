@@ -1,7 +1,8 @@
 extends Node2D
 
-const PLNSlashEffect = preload("res://scripts/PLNSlashEffect.gd")
-const CORRippleEffect = preload("res://scripts/CORRippleEffect.gd")
+const CharacterImpl_EXE = preload("res://scripts/CharacterImpl_EXE.gd")
+const CharacterImpl_COR = preload("res://scripts/CharacterImpl_COR.gd")
+const CharacterImpl_PLN = preload("res://scripts/CharacterImpl_PLN.gd")
 
 const COLS := 5
 const ROWS := 5
@@ -29,14 +30,9 @@ var bonus_move_stores_directional_memory: bool = false
 var bonus_move_is_attack: bool = false
 var cycle_counter: int = 0
 var freeze_steps: int = 0
-var _pln_pending_kill_pos: Vector2i = Vector2i(-1, -1)
-var _pln_pending_kill_dir: int = CharacterData.Direction.NONE
-var _pln_frozen_kill_pos: Vector2i = Vector2i(-1, -1)
 var _suppress_hit_effect_once: bool = false
-var _pln_defer_player_move: bool = false
 var _pending_kill_visual: Array[Vector2i] = []  # 正在等待延遲視覺更新的格子
 var _presenting_animation: bool = false
-var pending_post_defense_step: bool = false
 var survival_turns: int = 0
 
 var inventory: Inventory
@@ -47,6 +43,7 @@ var current_attack_mode_override: int = -1
 
 var cell_nodes: Array = []  # cell_nodes[row][col] = Cell node
 var player_node: Node2D
+var _char_impl  # CharacterImpl_EXE / CharacterImpl_COR / CharacterImpl_PLN
 
 var _cell_scene: PackedScene
 var _hit_effect_scene: PackedScene
@@ -85,6 +82,10 @@ func setup_character(char_name: String, attack_mode_override: int = -1) -> void:
 	current_attack_mode_override = attack_mode_override
 	inventory.setup(char_name)
 	player_node.set_character(char_name)
+	match char_name:
+		"EXE": _char_impl = CharacterImpl_EXE.new()
+		"COR": _char_impl = CharacterImpl_COR.new()
+		"PLN": _char_impl = CharacterImpl_PLN.new()
 
 func restart() -> void:
 	# Reset grid
@@ -111,12 +112,7 @@ func restart() -> void:
 	cycle_counter = 0
 	cycle_resolved = false
 	freeze_steps = 0
-	pending_post_defense_step = false
-	_pln_pending_kill_pos = Vector2i(-1, -1)
-	_pln_pending_kill_dir = CharacterData.Direction.NONE
-	_pln_frozen_kill_pos = Vector2i(-1, -1)
 	_suppress_hit_effect_once = false
-	_pln_defer_player_move = false
 	_pending_kill_visual.clear()
 	_presenting_animation = false
 	survival_turns = 0
@@ -179,27 +175,12 @@ func try_move(dir: int) -> bool:
 				cell_nodes[target.y][target.x].flash_shield_break(0.17)
 			, CONNECT_ONE_SHOT)
 			return _finalize_turn_after_action()
-		if _has_penetrating_attack():
-			_resolve_penetrating_attack(dir, origin, target, target_type)
-		elif _get_attack_mode() == CharacterData.AttackMode.DASH:
+		if _get_attack_mode() == CharacterData.AttackMode.DASH:
 			_resolve_attack(dir, target, target_type)
 			if grid[target.y][target.x] == CharacterData.CellType.LIVE:
 				player_pos = target
 				if _has_post_kill_reposition():
-					_pln_pending_kill_pos = target
-					_pln_defer_player_move = true
-					player_node.play_pln_charge_glow(dir)
-					# Spawn slash immediately at origin (normal windup rhythm)
-					var slash_fx: Node2D = Node2D.new()
-					slash_fx.set_script(PLNSlashEffect)
-					slash_fx.position = Vector2(
-						origin.x * CELL_STEP + CELL_SIZE / 2.0,
-						origin.y * CELL_STEP + CELL_SIZE / 2.0
-					)
-					add_child(slash_fx)
-					slash_fx.setup(Vector2(dv), false, -1.0, true, 175.0)
-					# Delay player visual move until tip hits
-					get_tree().create_timer(PLNSlashEffect.WINDUP + 0.03 + 0.10).timeout.connect(_pln_trigger_move)
+					_char_impl.begin_kill_anim(self, origin, target, dir)
 					_presenting_animation = true
 					player_node.emit_animation_done_after(player_node.get_hit_delay(true))
 				else:
@@ -211,7 +192,7 @@ func try_move(dir: int) -> bool:
 		if player_pos == origin:
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
 			var was_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
-			if _pln_pending_kill_pos == Vector2i(-1, -1):
+			if _char_impl.pending_kill_pos == Vector2i(-1, -1):
 				_presenting_animation = true
 				player_node.play_attack(dir, attack_hit, was_dash)
 
@@ -315,9 +296,9 @@ func try_bonus_move(dir: int) -> bool:
 		return true
 
 	player_pos = bonus_move_options[dir]
-	if _pln_pending_kill_pos != Vector2i(-1, -1):
+	if _char_impl.pending_kill_pos != Vector2i(-1, -1):
 		inventory.register_move(dir)
-		_resolve_pln_kill_visual()
+		_char_impl.resolve_kill_visual()
 	bonus_move_options.clear()
 	bonus_move_can_stay = false
 	if bonus_move_stores_directional_memory:
@@ -347,7 +328,7 @@ func try_bonus_stay() -> bool:
 	bonus_move_stores_memory = false
 	bonus_move_stores_directional_memory = false
 	bonus_move_is_attack = false
-	_pln_pending_kill_pos = Vector2i(-1, -1)
+	_char_impl.resolve_kill_visual()
 	if bonus_move_advances_turn:
 		bonus_move_advances_turn = false
 		return _finalize_turn_after_action()
@@ -370,22 +351,11 @@ func _has_pierce_passive() -> bool:
 	return _get_attack_mode() != CharacterData.AttackMode.DASH
 
 func _get_move_memory_token(dir: int) -> int:
-	var data = CharacterData.CHARACTERS[current_character]
-	if data.get("moves_generate_neutral_only", false):
-		return CharacterData.Direction.NEUTRAL
 	return dir
-
-func _has_penetrating_attack() -> bool:
-	var data = CharacterData.CHARACTERS[current_character]
-	return data.get("has_penetrating_attack", false)
 
 func _has_post_kill_reposition() -> bool:
 	var data = CharacterData.CHARACTERS[current_character]
 	return data.get("has_post_kill_reposition", false)
-
-func _has_post_defense_step() -> bool:
-	var data = CharacterData.CHARACTERS[current_character]
-	return data.get("has_post_defense_step", false)
 
 func _consume_neutral_memory() -> bool:
 	var neutral_idx: int = inventory.find_direction(CharacterData.Direction.NEUTRAL)
@@ -433,24 +403,6 @@ func _resolve_attack(dir: int, target: Vector2i, target_type: int) -> void:
 
 	_kill_flow(next_pos, dir, next_type)
 
-func _resolve_penetrating_attack(dir: int, origin: Vector2i, target: Vector2i, target_type: int) -> void:
-	_kill_flow(target, dir, target_type)
-
-	# If the first hit did not clear the target, DASH degrades into STRIKE and stays put.
-	if grid[target.y][target.x] != CharacterData.CellType.LIVE:
-		player_pos = origin
-		return
-
-	var behind = target + CharacterData.DIR_VECTOR[dir]
-	if behind.x < 0 or behind.x >= COLS or behind.y < 0 or behind.y >= ROWS:
-		player_pos = target
-		return
-	if grid[behind.y][behind.x] != CharacterData.CellType.LIVE:
-		player_pos = target
-		return
-
-	player_pos = behind
-
 func _begin_post_kill_reposition_if_needed(target: Vector2i, entry_dir: int) -> bool:
 	if not _has_post_kill_reposition():
 		return false
@@ -481,9 +433,6 @@ func _finalize_turn_after_action() -> bool:
 	survival_turns += 1
 	game_state.set_state(CharacterData.GameStateEnum.GENERATING)
 	_advance_cycle()
-	if _begin_post_defense_step_if_needed():
-		_refresh_visuals()
-		return true
 	_refresh_visuals()
 	_check_game_over()
 	return true
@@ -503,32 +452,7 @@ func try_ultimate() -> bool:
 	return true
 
 func _on_failed_kill(attack_dir: int) -> void:
-	if current_character == "COR":
-		var player_vpos := Vector2(player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
-								   player_pos.y * CELL_STEP + CELL_SIZE / 2.0)
-		var stall_pos := player_vpos + Vector2(CharacterData.DIR_VECTOR[attack_dir]) * 60.0
-		_spawn_cor_ripple_weak(stall_pos)
-
-func _spawn_cor_ripple_weak(world_pos: Vector2) -> void:
-	player_node.animation_done.connect(func() -> void:
-		var fx := Node2D.new()
-		fx.set_script(CORRippleEffect)
-		fx.set("weak", true)
-		fx.position = world_pos
-		add_child(fx)
-	, CONNECT_ONE_SHOT)
-
-func _spawn_cor_ripple(pos: Vector2i) -> void:
-	var world_pos := Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0,
-							 pos.y * CELL_STEP + CELL_SIZE / 2.0)
-	player_node.animation_done.connect(func() -> void:
-		get_tree().create_timer(0.15).timeout.connect(func() -> void:
-			var fx := Node2D.new()
-			fx.set_script(CORRippleEffect)
-			fx.position = world_pos
-			add_child(fx)
-		, CONNECT_ONE_SHOT)
-	, CONNECT_ONE_SHOT)
+	_char_impl.on_failed_kill(self, attack_dir)
 
 func _spawn_hit_effect(pos: Vector2i) -> void:
 	var world_pos := Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0,
@@ -543,22 +467,6 @@ func _spawn_hit_effect(pos: Vector2i) -> void:
 		fx.position = world_pos
 		add_child(fx)
 	, CONNECT_ONE_SHOT)
-
-func _pln_trigger_move() -> void:
-	if not _pln_defer_player_move:
-		return
-	_pln_defer_player_move = false
-	var from_pos := player_node.position
-	var to_pos := Vector2(
-		player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
-		player_pos.y * CELL_STEP + CELL_SIZE / 2.0
-	)
-	if from_pos != to_pos:
-		player_node.position = to_pos
-		player_node.play_move(from_pos)
-
-func _resolve_pln_kill_visual() -> void:
-	_pln_pending_kill_pos = Vector2i(-1, -1)
 
 func _on_player_animation_done() -> void:
 	_presenting_animation = false
@@ -598,8 +506,7 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 	score_manager.combo_counter += 1
 	score_manager.on_kill(cell_type)
 	_spawn_hit_effect(pos)
-	if current_character == "COR":
-		_spawn_cor_ripple(pos)
+	_char_impl.on_kill(self, pos, attack_dir)
 
 	# DEAD_DOUBLE: damage adjacent cells
 	if cell_type == CharacterData.CellType.DEAD_DOUBLE:
@@ -614,8 +521,7 @@ func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 				score_manager.combo_counter += 1
 				score_manager.on_kill(n_type)
 				_spawn_hit_effect(neighbor)
-				if current_character == "COR":
-					_spawn_cor_ripple(neighbor)
+				_char_impl.on_kill(self, neighbor, attack_dir)
 
 var cycle_resolved: bool = false  # true = this cycle already spawned, remaining turns idle
 
@@ -681,8 +587,6 @@ func _apply_candidate_spawn(pos: Vector2i) -> void:
 		if second != CharacterData.Direction.NONE:
 			score_manager.combo_counter += 1
 			score_manager.on_kill(cell_type)
-			if _has_post_defense_step():
-				pending_post_defense_step = true
 			return
 
 	_spawn_dead(pos, cell_type)
@@ -696,34 +600,6 @@ func _spawn_dead(pos: Vector2i, cell_type: int) -> void:
 
 func _pick_dead_type() -> int:
 	return SPAWN_CELL_TYPE
-
-func _begin_post_defense_step_if_needed() -> bool:
-	if not pending_post_defense_step:
-		return false
-	pending_post_defense_step = false
-	if inventory.find_direction(CharacterData.Direction.NEUTRAL) < 0:
-		return false
-
-	bonus_move_options.clear()
-	bonus_move_can_stay = false
-	bonus_move_advances_turn = false
-	bonus_move_stores_memory = false
-	bonus_move_stores_directional_memory = false
-	bonus_move_is_attack = true
-	for dir in CharacterData.DIR_VECTOR:
-		var pos = player_pos + CharacterData.DIR_VECTOR[dir]
-		if pos.x < 0 or pos.x >= COLS or pos.y < 0 or pos.y >= ROWS:
-			continue
-		if grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
-			continue
-		bonus_move_options[dir] = pos
-
-	if bonus_move_options.is_empty():
-		bonus_move_is_attack = false
-		return false
-
-	game_state.set_state(CharacterData.GameStateEnum.BONUS_MOVE_SELECT)
-	return true
 
 func _is_spawnable_live_cell(pos: Vector2i) -> bool:
 	if grid[pos.y][pos.x] != CharacterData.CellType.LIVE:
@@ -786,8 +662,8 @@ func _refresh_visuals() -> void:
 
 	player_node.set_facing(player_facing_dir)
 
-	# Update player position (skip if PLN move is deferred to timer)
-	if not _pln_defer_player_move:
+	# Update player position (skip if move is deferred to timer)
+	if not _char_impl.defer_player_move:
 		var old_player_visual_pos := player_node.position
 		player_node.position = Vector2(
 			player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
