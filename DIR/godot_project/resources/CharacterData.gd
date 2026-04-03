@@ -6,7 +6,7 @@ enum CellType { LIVE, DEAD, DEAD_SHIELD, DEAD_DOUBLE, DEAD_ONE_WAY_SHIELD, DEAD_
 
 enum AttackMode { DASH, STRIKE }
 
-enum GameStateEnum { IDLE, GENERATING, BONUS_MOVE_SELECT, GAME_OVER }
+enum GameStateEnum { IDLE, PRESENTING, GENERATING, BONUS_MOVE_SELECT, GAME_OVER }
 
 const DIR_VECTOR := {
 	Direction.UP:    Vector2i(0, -1),

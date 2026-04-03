@@ -1,5 +1,7 @@
 extends Node2D
 
+signal animation_done
+
 const PLNSlashEffect  = preload("res://scripts/PLNSlashEffect.gd")
 const PLNChargeGlow   = preload("res://scripts/PLNChargeGlow.gd")
 const PLNMoveTrail    = preload("res://scripts/PLNMoveTrail.gd")
@@ -141,6 +143,11 @@ func play_attack(dir: int, success: bool, is_dash: bool = false) -> void:
 		"EXE": _attack_EXE(dir, success, is_dash)
 		"GRD": _attack_GRD(dir, success, is_dash)
 		_:     _attack_generic(dir, success)
+	emit_animation_done_after(get_hit_delay(is_dash))
+
+func emit_animation_done_after(delay: float) -> void:
+	get_tree().create_timer(delay).timeout.connect(
+		func(): animation_done.emit(), CONNECT_ONE_SHOT)
 
 func _attack_COR(dir: int, success: bool, is_dash: bool) -> void:
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]

@@ -35,6 +35,7 @@ var _pln_frozen_kill_pos: Vector2i = Vector2i(-1, -1)
 var _suppress_hit_effect_once: bool = false
 var _pln_defer_player_move: bool = false
 var _pending_kill_visual: Array[Vector2i] = []  # 正在等待延遲視覺更新的格子
+var _presenting_animation: bool = false
 var pending_post_defense_step: bool = false
 var survival_turns: int = 0
 
@@ -73,6 +74,7 @@ func _ready() -> void:
 	# Player node
 	player_node = player_scene.instantiate()
 	add_child(player_node)
+	player_node.animation_done.connect(_on_player_animation_done)
 
 	get_viewport().size_changed.connect(_update_board_offset)
 	_update_board_offset()
@@ -116,6 +118,7 @@ func restart() -> void:
 	_suppress_hit_effect_once = false
 	_pln_defer_player_move = false
 	_pending_kill_visual.clear()
+	_presenting_animation = false
 	survival_turns = 0
 
 	setup_character(current_character, current_attack_mode_override)
@@ -127,6 +130,7 @@ func restart() -> void:
 func debug_preview_charge() -> void:
 	if current_character != "PLN":
 		return
+	_presenting_animation = true
 	player_node.play_attack(player_facing_dir, true, true)
 
 func try_move(dir: int) -> bool:
@@ -165,14 +169,15 @@ func try_move(dir: int) -> bool:
 		player_facing_dir = dir
 		if _try_break_one_way_shield(target, dir, target_type):
 			var _is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
-			var _delay: float = player_node.get_hit_delay(_is_dash)
 			_pending_kill_visual.append(target)
-			get_tree().create_timer(_delay).timeout.connect(func():
+			_presenting_animation = true
+			player_node.play_attack(dir, false, _is_dash)
+			player_node.animation_done.connect(func():
 				_pending_kill_visual.erase(target)
 				cell_nodes[target.y][target.x].set_type(CharacterData.CellType.DEAD)
 				cell_nodes[target.y][target.x].set_shield_dir(CharacterData.Direction.NONE)
-				cell_nodes[target.y][target.x].flash_shield_break(0.17))
-			player_node.play_attack(dir, false, _is_dash)
+				cell_nodes[target.y][target.x].flash_shield_break(0.17)
+			, CONNECT_ONE_SHOT)
 			return _finalize_turn_after_action()
 		if _has_penetrating_attack():
 			_resolve_penetrating_attack(dir, origin, target, target_type)
@@ -195,8 +200,11 @@ func try_move(dir: int) -> bool:
 					slash_fx.setup(Vector2(dv), false, -1.0, true, 175.0)
 					# Delay player visual move until tip hits
 					get_tree().create_timer(PLNSlashEffect.WINDUP + 0.03 + 0.10).timeout.connect(_pln_trigger_move)
+					_presenting_animation = true
+					player_node.emit_animation_done_after(player_node.get_hit_delay(true))
 				else:
 					inventory.register_move(dir)
+					_presenting_animation = true
 					player_node.play_attack(dir, true, true)
 		else:
 			_resolve_attack(dir, target, target_type)
@@ -204,6 +212,7 @@ func try_move(dir: int) -> bool:
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
 			var was_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
 			if _pln_pending_kill_pos == Vector2i(-1, -1):
+				_presenting_animation = true
 				player_node.play_attack(dir, attack_hit, was_dash)
 
 		if _begin_post_kill_reposition_if_needed(target, dir):
@@ -239,14 +248,15 @@ func try_charge_action() -> bool:
 		var pos_before_attack := player_pos
 		if _try_break_one_way_shield(target, dir, target_type):
 			var _is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
-			var _delay: float = player_node.get_hit_delay(_is_dash)
 			_pending_kill_visual.append(target)
-			get_tree().create_timer(_delay).timeout.connect(func():
+			_presenting_animation = true
+			player_node.play_attack(dir, false, _is_dash)
+			player_node.animation_done.connect(func():
 				_pending_kill_visual.erase(target)
 				cell_nodes[target.y][target.x].set_type(CharacterData.CellType.DEAD)
 				cell_nodes[target.y][target.x].set_shield_dir(CharacterData.Direction.NONE)
-				cell_nodes[target.y][target.x].flash_shield_break(0.17))
-			player_node.play_attack(dir, false, _is_dash)
+				cell_nodes[target.y][target.x].flash_shield_break(0.17)
+			, CONNECT_ONE_SHOT)
 			return _finalize_turn_after_action()
 		if _get_attack_mode() == CharacterData.AttackMode.DASH:
 			_resolve_attack(dir, target, target_type)
@@ -257,6 +267,7 @@ func try_charge_action() -> bool:
 		if player_pos == pos_before_attack:
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
 			var was_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
+			_presenting_animation = true
 			player_node.play_attack(dir, attack_hit, was_dash)
 	return _finalize_turn_after_action()
 
@@ -291,11 +302,14 @@ func try_bonus_move(dir: int) -> bool:
 			_refresh_visuals()
 			_check_game_over()
 			return true
+		var _did_bonus_attack := false
 		if target_type != CharacterData.CellType.LIVE:
 			_resolve_attack(dir, target, target_type)
 			var attack_hit: bool = (grid[target.y][target.x] == CharacterData.CellType.LIVE)
+			_presenting_animation = true
 			player_node.play_attack(dir, attack_hit)
-		game_state.set_state(CharacterData.GameStateEnum.IDLE)
+			_did_bonus_attack = true
+		game_state.set_state(CharacterData.GameStateEnum.PRESENTING if _did_bonus_attack else CharacterData.GameStateEnum.IDLE)
 		_refresh_visuals()
 		_check_game_over()
 		return true
@@ -493,44 +507,42 @@ func _on_failed_kill(attack_dir: int) -> void:
 		var player_vpos := Vector2(player_pos.x * CELL_STEP + CELL_SIZE / 2.0,
 								   player_pos.y * CELL_STEP + CELL_SIZE / 2.0)
 		var stall_pos := player_vpos + Vector2(CharacterData.DIR_VECTOR[attack_dir]) * 60.0
-		var is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
-		_spawn_cor_ripple_weak(stall_pos, player_node.get_hit_delay(is_dash))
+		_spawn_cor_ripple_weak(stall_pos)
 
-func _spawn_cor_ripple_weak(world_pos: Vector2, delay: float) -> void:
-	get_tree().create_timer(delay).timeout.connect(func() -> void:
+func _spawn_cor_ripple_weak(world_pos: Vector2) -> void:
+	player_node.animation_done.connect(func() -> void:
 		var fx := Node2D.new()
 		fx.set_script(CORRippleEffect)
 		fx.set("weak", true)
 		fx.position = world_pos
 		add_child(fx)
-	)
+	, CONNECT_ONE_SHOT)
 
 func _spawn_cor_ripple(pos: Vector2i) -> void:
-	var is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
-	var delay: float = player_node.get_hit_delay(is_dash) + 0.15   # hit + arc 動畫結束
 	var world_pos := Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0,
 							 pos.y * CELL_STEP + CELL_SIZE / 2.0)
-	get_tree().create_timer(delay).timeout.connect(func() -> void:
-		var fx := Node2D.new()
-		fx.set_script(CORRippleEffect)
-		fx.position = world_pos
-		add_child(fx)
-	)
+	player_node.animation_done.connect(func() -> void:
+		get_tree().create_timer(0.15).timeout.connect(func() -> void:
+			var fx := Node2D.new()
+			fx.set_script(CORRippleEffect)
+			fx.position = world_pos
+			add_child(fx)
+		, CONNECT_ONE_SHOT)
+	, CONNECT_ONE_SHOT)
 
 func _spawn_hit_effect(pos: Vector2i) -> void:
-	var is_dash := _get_attack_mode() == CharacterData.AttackMode.DASH
-	var delay: float = player_node.get_hit_delay(is_dash)
 	var world_pos := Vector2(pos.x * CELL_STEP + CELL_SIZE / 2.0,
 							 pos.y * CELL_STEP + CELL_SIZE / 2.0)
 	_pending_kill_visual.append(pos)
-	get_tree().create_timer(delay).timeout.connect(func():
+	player_node.animation_done.connect(func():
 		_pending_kill_visual.erase(pos)
 		cell_nodes[pos.y][pos.x].set_type(CharacterData.CellType.LIVE)
 		cell_nodes[pos.y][pos.x].set_shield_dir(CharacterData.Direction.NONE)
 		var fx := _hit_effect_scene.instantiate()
 		fx.z_index = 5
 		fx.position = world_pos
-		add_child(fx))
+		add_child(fx)
+	, CONNECT_ONE_SHOT)
 
 func _pln_trigger_move() -> void:
 	if not _pln_defer_player_move:
@@ -547,6 +559,11 @@ func _pln_trigger_move() -> void:
 
 func _resolve_pln_kill_visual() -> void:
 	_pln_pending_kill_pos = Vector2i(-1, -1)
+
+func _on_player_animation_done() -> void:
+	_presenting_animation = false
+	if game_state.current_state == CharacterData.GameStateEnum.PRESENTING:
+		game_state.set_state(CharacterData.GameStateEnum.IDLE)
 
 func _kill_flow(pos: Vector2i, attack_dir: int, cell_type: int) -> void:
 	if cell_type == CharacterData.CellType.DEAD_ONE_WAY_SHIELD:
@@ -627,7 +644,8 @@ func _advance_cycle() -> void:
 		cycle_counter = 0
 		cycle_resolved = false
 
-	game_state.set_state(CharacterData.GameStateEnum.IDLE)
+	var _next_state := CharacterData.GameStateEnum.PRESENTING if _presenting_animation else CharacterData.GameStateEnum.IDLE
+	game_state.set_state(_next_state)
 
 func _start_new_cycle() -> void:
 	candidate_cells.clear()
