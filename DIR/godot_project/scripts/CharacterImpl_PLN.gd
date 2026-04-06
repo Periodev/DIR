@@ -59,7 +59,7 @@ func on_failed_kill(_board: Node2D, _attack_dir: int) -> void:
 func begin_kill_anim(board: Node2D, origin: Vector2i, target: Vector2i, dir: int) -> void:
 	pending_kill_pos = target
 	defer_player_move = true
-	board.player_node.play_pln_charge_glow(dir)
+	board.player_node.play_charge_preview(dir)
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var slash_fx: Node2D = Node2D.new()
 	slash_fx.set_script(PLNSlashEffect)

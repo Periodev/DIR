@@ -86,7 +86,7 @@ func emit_animation_done_after(delay: float) -> void:
 	get_tree().create_timer(delay).timeout.connect(
 		func(): animation_done.emit(), CONNECT_ONE_SHOT)
 
-func play_pln_charge_glow(dir: int) -> void:
+func play_charge_preview(dir: int) -> void:
 	_char_impl.play_charge_preview(self, dir)
 
 func get_hit_delay(is_dash: bool = false) -> float:
