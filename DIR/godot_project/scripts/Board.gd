@@ -122,8 +122,8 @@ func restart() -> void:
 	_refresh_visuals()
 
 func debug_preview_charge() -> void:
-	if current_character != "PLN":
-		return
+	#if current_character != "PLN":
+	#	return
 	game_state.set_state(CharacterData.GameStateEnum.PRESENTING)
 	player_node.play_attack(player_facing_dir, true, true)
 
