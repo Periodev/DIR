@@ -3,6 +3,11 @@ class_name CharacterData
 enum Direction { NONE = 0, UP = 1, DOWN = 2, LEFT = 3, RIGHT = 4 }
 enum CellType { LIVE, ENEMY }
 
+class Config:
+	var seq_slots: int = 3
+	var max_moves: int = 3
+	var max_attacks: int = 3
+
 const DIR_VECTOR: Dictionary = {
 	Direction.UP:    Vector2i(0, -1),
 	Direction.DOWN:  Vector2i(0, 1),

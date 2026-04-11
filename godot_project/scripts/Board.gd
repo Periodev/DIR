@@ -6,7 +6,6 @@ const CELL_SIZE: float = 100.0
 const CELL_GAP: float = 8.0
 const CELL_STEP: float = CELL_SIZE + CELL_GAP
 
-const SEQ_SLOTS: int = 3
 const SEQ_SIZE: float = 85.0
 const SEQ_GAP: float = 8.0
 const SEQ_STEP: float = SEQ_SIZE + SEQ_GAP
@@ -14,10 +13,17 @@ const SEQ_MARGIN_TOP: float = 20.0
 
 signal board_updated
 
+var char_config: CharacterData.Config = null
+
 var grid: Array[Array] = []
 var player_pos: Vector2i = Vector2i(COLS / 2, ROWS / 2)
 var action_seq: Array[int] = []
+var action_seq_is_attack: Array[bool] = []
+var moves_this_turn: int = 0
+var attacks_this_turn: int = 0
 var turn: int = 1
+
+const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 
 var cell_nodes: Array[Array] = []
 var _cell_scene: PackedScene = null
@@ -65,6 +71,7 @@ class ArrowOverlay extends Node2D:
 			draw_polyline(PackedVector2Array([top_pt, tip, bot_pt]), COLOR, LINE_W, true)
 
 func _ready() -> void:
+	char_config = _EXE_SCRIPT.get_config()
 	_cell_scene = load("res://scenes/Cell.tscn")
 
 	for r: int in ROWS:
@@ -94,11 +101,16 @@ func restart() -> void:
 		grid.append(row)
 	player_pos = Vector2i(COLS / 2, ROWS / 2)
 	action_seq.clear()
+	action_seq_is_attack.clear()
+	moves_this_turn = 0
+	attacks_this_turn = 0
 	turn = 1
 	_refresh_visuals()
 
 func try_move(dir: int) -> bool:
-	if action_seq.size() >= SEQ_SLOTS:
+	if action_seq.size() >= char_config.seq_slots:
+		return false
+	if moves_this_turn >= char_config.max_moves:
 		return false
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var target: Vector2i = player_pos + dv
@@ -108,11 +120,15 @@ func try_move(dir: int) -> bool:
 		return false
 	player_pos = target
 	action_seq.append(dir)
+	action_seq_is_attack.append(false)
+	moves_this_turn += 1
 	_refresh_visuals()
 	return true
 
 func try_attack(dir: int) -> bool:
-	if action_seq.size() >= SEQ_SLOTS:
+	if action_seq.size() >= char_config.seq_slots:
+		return false
+	if attacks_this_turn >= char_config.max_attacks:
 		return false
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var target: Vector2i = player_pos + dv
@@ -122,12 +138,17 @@ func try_attack(dir: int) -> bool:
 		return false
 	grid[target.y][target.x] = CharacterData.CellType.LIVE
 	action_seq.append(dir)
+	action_seq_is_attack.append(true)
+	attacks_this_turn += 1
 	_refresh_visuals()
 	return true
 
 func try_end_turn() -> bool:
 	turn += 1
 	action_seq.clear()
+	action_seq_is_attack.clear()
+	moves_this_turn = 0
+	attacks_this_turn = 0
 	_refresh_visuals()
 	return true
 
@@ -156,14 +177,15 @@ func _refresh_visuals() -> void:
 func _draw() -> void:
 	var font: Font = ThemeDB.fallback_font
 	var font_size: int = 32
+	var slots: int = char_config.seq_slots
 
 	var board_w: float = (COLS - 1) * CELL_STEP + CELL_SIZE
-	var total_seq_w: float = (SEQ_SLOTS - 1) * SEQ_STEP + SEQ_SIZE
+	var total_seq_w: float = (slots - 1) * SEQ_STEP + SEQ_SIZE
 	var seq_x0: float = (board_w - total_seq_w) / 2.0
 	var seq_y: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP
 
 	# Action sequence slots
-	for i: int in SEQ_SLOTS:
+	for i: int in slots:
 		var x: float = seq_x0 + i * SEQ_STEP
 		var rect: Rect2 = Rect2(x, seq_y, SEQ_SIZE, SEQ_SIZE)
 		draw_rect(rect, Color(0.10, 0.10, 0.13))
@@ -172,8 +194,9 @@ func _draw() -> void:
 		if i < action_seq.size():
 			var arrow: String = CharacterData.DIR_ARROWS[action_seq[i]]
 			var text_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+			var col: Color = Color(1.0, 0.6, 0.15) if action_seq_is_attack[i] else Color.WHITE
 			draw_string(font, Vector2(x, text_y), arrow,
-				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color.WHITE)
+				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
 
 	# Turn counter (right of board)
 	var side_x: float = board_w + 28.0
