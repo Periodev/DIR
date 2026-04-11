@@ -339,6 +339,18 @@ func _remove_enemy(p: Vector2i) -> void:
 		grid[p.y][p.x] = CharacterData.CellType.LIVE
 		kill_count += 1
 
+# Hit with direction: respects shield (strip on shield side, kill on open side)
+func _hit_cell(p: Vector2i, attack_dir: int) -> void:
+	if not _in_bounds(p) or not CharacterData.is_enemy(grid[p.y][p.x]):
+		return
+	var shield_dir: int = CharacterData.get_shield_dir(grid[p.y][p.x])
+	if shield_dir != CharacterData.Direction.NONE and \
+			CharacterData.DIR_VECTOR[attack_dir] + CharacterData.DIR_VECTOR[shield_dir] == Vector2i.ZERO:
+		grid[p.y][p.x] = CharacterData.CellType.ENEMY  # strip shield
+	else:
+		grid[p.y][p.x] = CharacterData.CellType.LIVE
+		kill_count += 1
+
 func get_skill_preview_cells(slot: int) -> Dictionary:
 	var result: Dictionary = {"move": [], "hit": []}
 	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
@@ -427,8 +439,8 @@ func use_skill(slot: int) -> void:
 				player_pos = move_target
 				_remove_enemy(player_pos + dv_atk)
 		CharacterData.SkillType.SAME_AA:
-			_remove_enemy(pos + dv_seq)
-			_remove_enemy(pos + 2 * dv_seq)
+			_hit_cell(pos + dv_seq, slot_data[0])
+			_hit_cell(pos + 2 * dv_seq, slot_data[0])
 		CharacterData.SkillType.ORTHO_AA:
 			_remove_enemy(pos + dv_seq)
 			_remove_enemy(pos + dv_atk)
