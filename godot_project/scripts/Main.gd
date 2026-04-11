@@ -6,6 +6,16 @@ func _ready() -> void:
 	board.restart()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and not event.echo:
+		var kc: Key = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
+		if kc == KEY_SHIFT:
+			board.set_skill_preview(0 if event.pressed else -1)
+			get_viewport().set_input_as_handled()
+			return
+		if kc == KEY_CTRL:
+			board.set_skill_preview(1 if event.pressed else -1)
+			get_viewport().set_input_as_handled()
+			return
 	if not (event is InputEventKey) or not event.pressed or event.echo:
 		return
 	var keycode: Key = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode

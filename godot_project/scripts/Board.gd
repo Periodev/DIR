@@ -30,6 +30,7 @@ var attack_queue: Array[int] = []
 var attack_queue_highlighted: int = -1
 
 var skill_slots: Array = [[], []]
+var skill_preview: int = -1  # -1 = none, 0/1 = slot index being held
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 
@@ -77,6 +78,19 @@ class ArrowOverlay extends Node2D:
 			var top_pt: Vector2 = shaft_end - perp * HEAD_ARM
 			var bot_pt: Vector2 = shaft_end + perp * HEAD_ARM
 			draw_polyline(PackedVector2Array([top_pt, tip, bot_pt]), COLOR, LINE_W, true)
+
+		# Skill preview highlight
+		if board.skill_preview >= 0 and board.skill_preview < board.SKILL_SLOTS:
+			if not board.skill_slots[board.skill_preview].is_empty():
+				var preview: Dictionary = board.get_skill_preview_cells(board.skill_preview)
+				for p in preview.get("move", []):
+					if p.x >= 0 and p.x < COLS_ and p.y >= 0 and p.y < ROWS_:
+						draw_rect(Rect2(p.x * CELL_STEP_, p.y * CELL_STEP_, CELL_SIZE_, CELL_SIZE_),
+							Color(0.3, 0.8, 0.3, 0.35))
+				for p in preview.get("hit", []):
+					if p.x >= 0 and p.x < COLS_ and p.y >= 0 and p.y < ROWS_:
+						draw_rect(Rect2(p.x * CELL_STEP_, p.y * CELL_STEP_, CELL_SIZE_, CELL_SIZE_),
+							Color(1.0, 0.3, 0.3, 0.4))
 
 func _ready() -> void:
 	char_config = _EXE_SCRIPT.get_config()
@@ -267,10 +281,12 @@ func _draw() -> void:
 	for i: int in SKILL_SLOTS:
 		var sx: float = i * SEQ_STEP
 		var srect: Rect2 = Rect2(sx, skill_y, SEQ_SIZE, SEQ_SIZE)
+		var is_previewing: bool = skill_preview == i
 		draw_rect(srect, Color(0.08, 0.08, 0.18))
-		draw_rect(srect, Color(0.35, 0.35, 0.65), false, 1.5)
+		draw_rect(srect, Color(0.65, 0.65, 1.0) if is_previewing else Color(0.35, 0.35, 0.65),
+			false, 2.5 if is_previewing else 1.5)
 		if not skill_slots[i].is_empty():
-			var stext_y: float = skill_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0
+			var stext_y: float = skill_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0 - 8.0
 			var half: float = SEQ_SIZE / 2.0
 			var col_a: Color = Color(1.0, 0.6, 0.15) if skill_slots[i][2] else Color.WHITE
 			var col_b: Color = Color(1.0, 0.6, 0.15)
@@ -280,6 +296,10 @@ func _draw() -> void:
 			draw_string(font, Vector2(sx + half, stext_y),
 				CharacterData.DIR_ARROWS[skill_slots[i][1]],
 				HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_b)
+			var stype: int = CharacterData.classify_skill(skill_slots[i])
+			var type_name: String = CharacterData.SKILL_TYPE_NAMES[stype]
+			draw_string(font, Vector2(sx, skill_y + SEQ_SIZE - 2.0), type_name,
+				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
 
 	# Turn counter (right of board)
 	var side_x: float = board_w + 28.0
@@ -293,3 +313,75 @@ func _update_board_offset() -> void:
 	var total_h: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE + SKILL_MARGIN_TOP + SEQ_SIZE
 	var vp: Vector2 = get_viewport_rect().size
 	position = Vector2((vp.x - board_w) / 2.0, (vp.y - total_h) / 2.0)
+
+func _in_bounds(p: Vector2i) -> bool:
+	return p.x >= 0 and p.x < COLS and p.y >= 0 and p.y < ROWS
+
+func _remove_enemy(p: Vector2i) -> void:
+	if not _in_bounds(p):
+		return
+	if grid[p.y][p.x] == CharacterData.CellType.ENEMY:
+		grid[p.y][p.x] = CharacterData.CellType.LIVE
+
+func get_skill_preview_cells(slot: int) -> Dictionary:
+	var result: Dictionary = {"move": [], "hit": []}
+	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
+		return result
+	var slot_data: Array = skill_slots[slot]
+	var stype: int = CharacterData.classify_skill(slot_data)
+	var dv_seq: Vector2i = CharacterData.DIR_VECTOR[slot_data[0]]
+	var dv_atk: Vector2i = CharacterData.DIR_VECTOR[slot_data[1]]
+	var pos: Vector2i = player_pos
+	match stype:
+		CharacterData.SkillType.SAME_MA:
+			result["move"].append(pos + dv_seq)
+			result["hit"].append(pos + dv_seq)
+		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
+			result["move"].append(pos + dv_seq)
+			result["hit"].append(pos + dv_seq + dv_atk)
+		CharacterData.SkillType.SAME_AA:
+			if _in_bounds(pos + dv_seq):
+				result["hit"].append(pos + dv_seq)
+			if _in_bounds(pos + 2 * dv_seq):
+				result["hit"].append(pos + 2 * dv_seq)
+		CharacterData.SkillType.ORTHO_AA:
+			if _in_bounds(pos + dv_seq):
+				result["hit"].append(pos + dv_seq)
+			if _in_bounds(pos + dv_atk):
+				result["hit"].append(pos + dv_atk)
+			if _in_bounds(pos + dv_seq + dv_atk):
+				result["hit"].append(pos + dv_seq + dv_atk)
+	return result
+
+func set_skill_preview(slot: int) -> void:
+	skill_preview = slot
+	if _arrow_overlay:
+		_arrow_overlay.queue_redraw()
+	queue_redraw()
+
+func use_skill(slot: int) -> void:
+	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
+		return
+	var slot_data: Array = skill_slots[slot]
+	var stype: int = CharacterData.classify_skill(slot_data)
+	var dv_seq: Vector2i = CharacterData.DIR_VECTOR[slot_data[0]]
+	var dv_atk: Vector2i = CharacterData.DIR_VECTOR[slot_data[1]]
+	var pos: Vector2i = player_pos
+	match stype:
+		CharacterData.SkillType.SAME_MA:
+			_remove_enemy(pos + dv_seq)
+			player_pos = pos + dv_seq
+		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
+			var move_target: Vector2i = pos + dv_seq
+			if _in_bounds(move_target) and grid[move_target.y][move_target.x] == CharacterData.CellType.LIVE:
+				player_pos = move_target
+				_remove_enemy(player_pos + dv_atk)
+		CharacterData.SkillType.SAME_AA:
+			_remove_enemy(pos + dv_seq)
+			_remove_enemy(pos + 2 * dv_seq)
+		CharacterData.SkillType.ORTHO_AA:
+			_remove_enemy(pos + dv_seq)
+			_remove_enemy(pos + dv_atk)
+			_remove_enemy(pos + dv_seq + dv_atk)
+	skill_slots[slot] = []
+	_refresh_visuals()
