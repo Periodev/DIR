@@ -344,8 +344,7 @@ func get_skill_preview_cells(slot: int) -> Dictionary:
 	match stype:
 		CharacterData.SkillType.SAME_MA:
 			result["move"].append(pos + dv_seq)
-			if _in_bounds(pos + 2 * dv_seq):
-				result["hit"].append(pos + 2 * dv_seq)
+			result["hit"].append(pos + dv_seq)
 		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
 			result["move"].append(pos + dv_seq)
 			result["hit"].append(pos + dv_seq + dv_atk)
@@ -412,9 +411,9 @@ func use_skill(slot: int) -> void:
 	match stype:
 		CharacterData.SkillType.SAME_MA:
 			var move_target: Vector2i = pos + dv_seq
-			if _in_bounds(move_target) and grid[move_target.y][move_target.x] == CharacterData.CellType.LIVE:
+			if _in_bounds(move_target):
+				_remove_enemy(move_target)
 				player_pos = move_target
-				_remove_enemy(player_pos + dv_atk)
 		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
 			var move_target: Vector2i = pos + dv_seq
 			if _in_bounds(move_target) and grid[move_target.y][move_target.x] == CharacterData.CellType.LIVE:
