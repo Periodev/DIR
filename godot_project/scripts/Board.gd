@@ -130,6 +130,7 @@ func restart() -> void:
 	attack_queue.clear()
 	attack_queue_highlighted = -1
 	skill_slots = [[], []]
+	skill_preview = -1
 	_refresh_visuals()
 
 func try_move(dir: int) -> bool:
@@ -358,6 +359,40 @@ func set_skill_preview(slot: int) -> void:
 	if _arrow_overlay:
 		_arrow_overlay.queue_redraw()
 	queue_redraw()
+
+func rotate_armed_skill(new_dir: int) -> void:
+	var slot: int = skill_preview
+	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
+		return
+	var data: Array = skill_slots[slot].duplicate()
+	var stype: int = CharacterData.classify_skill(data)
+	if stype == CharacterData.SkillType.SAME_MA or stype == CharacterData.SkillType.SAME_AA:
+		data[0] = new_dir
+		data[1] = new_dir
+	elif stype == CharacterData.SkillType.LEFT_MA or stype == CharacterData.SkillType.RIGHT_MA:
+		# Any arrow sets the new forward; hook side (left/right relative to forward) is preserved.
+		# LEFT_MA: atk = CW perp of forward = (dv.y, -dv.x)
+		# RIGHT_MA: atk = CCW perp of forward = (-dv.y, dv.x)
+		data[0] = new_dir
+		var dv: Vector2i = CharacterData.DIR_VECTOR[new_dir]
+		var atk_dv: Vector2i = Vector2i(dv.y, -dv.x) if stype == CharacterData.SkillType.LEFT_MA \
+			else Vector2i(-dv.y, dv.x)
+		for d: int in CharacterData.DIR_VECTOR:
+			if CharacterData.DIR_VECTOR[d] == atk_dv:
+				data[1] = d
+				break
+	else:
+		# ORTHO_AA: axis-replacement (H key replaces H component, V key replaces V component)
+		var new_is_h: bool = (new_dir == CharacterData.Direction.LEFT
+			or new_dir == CharacterData.Direction.RIGHT)
+		var d0_is_h: bool = (data[0] == CharacterData.Direction.LEFT
+			or data[0] == CharacterData.Direction.RIGHT)
+		if d0_is_h == new_is_h:
+			data[0] = new_dir
+		else:
+			data[1] = new_dir
+	skill_slots[slot] = data
+	_refresh_visuals()
 
 func use_skill(slot: int) -> void:
 	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
