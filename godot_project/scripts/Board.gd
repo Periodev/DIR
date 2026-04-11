@@ -431,18 +431,18 @@ func use_skill(slot: int) -> void:
 		CharacterData.SkillType.SAME_MA:
 			var move_target: Vector2i = pos + dv_seq
 			if _in_bounds(move_target):
-				_remove_enemy(move_target)
+				_hit_cell(move_target, slot_data[0])
 				player_pos = move_target
 		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
 			var move_target: Vector2i = pos + dv_seq
 			if _in_bounds(move_target) and grid[move_target.y][move_target.x] == CharacterData.CellType.LIVE:
 				player_pos = move_target
-				_remove_enemy(player_pos + dv_atk)
+				_hit_cell(player_pos + dv_atk, slot_data[1])
 		CharacterData.SkillType.SAME_AA:
 			_hit_cell(pos + dv_seq, slot_data[0])
 			_hit_cell(pos + 2 * dv_seq, slot_data[0])
 		CharacterData.SkillType.ORTHO_AA:
-			_remove_enemy(pos + dv_seq)
-			_remove_enemy(pos + dv_atk)
+			_hit_cell(pos + dv_seq, slot_data[0])
+			_hit_cell(pos + dv_atk, slot_data[1])
 	skill_slots[slot] = []
 	_refresh_visuals()
