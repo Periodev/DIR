@@ -32,6 +32,7 @@ var attack_queue_highlighted: int = -1
 var skill_slots: Array = [[], []]
 var skill_preview: int = -1  # -1 = none, 0/1 = slot index being held
 var kill_count: int = 0
+var shield_spawn_turn: Dictionary = {}  # Vector2i -> int (turn when spawned)
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 
@@ -133,6 +134,7 @@ func restart() -> void:
 	skill_slots = [[], []]
 	skill_preview = -1
 	kill_count = 0
+	shield_spawn_turn.clear()
 	_refresh_visuals()
 
 func try_move(dir: int) -> bool:
@@ -167,7 +169,9 @@ func try_attack(dir: int) -> bool:
 	var shield_dir: int = CharacterData.get_shield_dir(grid[target.y][target.x])
 	if shield_dir != CharacterData.Direction.NONE and \
 			CharacterData.DIR_VECTOR[dir] + CharacterData.DIR_VECTOR[shield_dir] == Vector2i.ZERO:
-		grid[target.y][target.x] = CharacterData.CellType.ENEMY  # hit shield → strip it
+		if not CharacterData.is_hard_shield(grid[target.y][target.x]):
+			grid[target.y][target.x] = CharacterData.CellType.ENEMY  # hit shield → strip it
+		# hard shield: absorb, do nothing
 	else:
 		grid[target.y][target.x] = CharacterData.CellType.LIVE   # unshielded side → kill
 		kill_count += 1
@@ -188,6 +192,7 @@ func try_end_turn() -> bool:
 	action_seq_is_attack.clear()
 	moves_this_turn = 0
 	attacks_this_turn = 0
+	_harden_old_shields()
 	debug_spawn_enemies(3)
 	return true
 
@@ -231,6 +236,7 @@ func debug_spawn_enemies(count: int) -> void:
 		var epos: Vector2i = available[i]
 		var sd: int = CharacterData.dominant_cardinal(player_pos - epos)
 		grid[epos.y][epos.x] = CharacterData.shield_enemy_for_dir(sd)
+		shield_spawn_turn[epos] = turn
 	_refresh_visuals()
 
 func _refresh_visuals() -> void:
@@ -338,18 +344,32 @@ func _remove_enemy(p: Vector2i) -> void:
 	if CharacterData.is_enemy(grid[p.y][p.x]):
 		grid[p.y][p.x] = CharacterData.CellType.LIVE
 		kill_count += 1
+		shield_spawn_turn.erase(p)
+
+func _harden_old_shields() -> void:
+	for pos: Vector2i in shield_spawn_turn.keys():
+		if turn - shield_spawn_turn[pos] >= 2:
+			var cell: int = grid[pos.y][pos.x]
+			if CharacterData.is_enemy(cell) and not CharacterData.is_hard_shield(cell):
+				grid[pos.y][pos.x] = CharacterData.harden_shield(cell)
+			shield_spawn_turn.erase(pos)
 
 # Hit with direction: respects shield (strip on shield side, kill on open side)
 func _hit_cell(p: Vector2i, attack_dir: int) -> void:
 	if not _in_bounds(p) or not CharacterData.is_enemy(grid[p.y][p.x]):
 		return
-	var shield_dir: int = CharacterData.get_shield_dir(grid[p.y][p.x])
+	var cell: int = grid[p.y][p.x]
+	var shield_dir: int = CharacterData.get_shield_dir(cell)
 	if shield_dir != CharacterData.Direction.NONE and \
 			CharacterData.DIR_VECTOR[attack_dir] + CharacterData.DIR_VECTOR[shield_dir] == Vector2i.ZERO:
-		grid[p.y][p.x] = CharacterData.CellType.ENEMY  # strip shield
+		if not CharacterData.is_hard_shield(cell):
+			grid[p.y][p.x] = CharacterData.CellType.ENEMY  # strip shield
+			shield_spawn_turn.erase(p)
+		# hard shield: absorb, do nothing
 	else:
 		grid[p.y][p.x] = CharacterData.CellType.LIVE
 		kill_count += 1
+		shield_spawn_turn.erase(p)
 
 func get_skill_preview_cells(slot: int) -> Dictionary:
 	var result: Dictionary = {"move": [], "hit": []}
@@ -441,6 +461,9 @@ func use_skill(slot: int) -> void:
 						else:
 							grid[push_dest.y][push_dest.x] = grid[move_target.y][move_target.x]
 							grid[move_target.y][move_target.x] = CharacterData.CellType.LIVE
+							if shield_spawn_turn.has(move_target):
+								shield_spawn_turn[push_dest] = shield_spawn_turn[move_target]
+								shield_spawn_turn.erase(move_target)
 				player_pos = move_target  # 流程後 move_target 必為空
 		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
 			var move_target: Vector2i = pos + dv_seq

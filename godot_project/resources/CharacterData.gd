@@ -1,18 +1,31 @@
 class_name CharacterData
 
 enum Direction { NONE = 0, UP = 1, DOWN = 2, LEFT = 3, RIGHT = 4 }
-enum CellType { LIVE, ENEMY, ENEMY_SHIELD_UP, ENEMY_SHIELD_DOWN, ENEMY_SHIELD_LEFT, ENEMY_SHIELD_RIGHT }
+enum CellType { LIVE, ENEMY, ENEMY_SHIELD_UP, ENEMY_SHIELD_DOWN, ENEMY_SHIELD_LEFT, ENEMY_SHIELD_RIGHT,
+	ENEMY_HARD_SHIELD_UP, ENEMY_HARD_SHIELD_DOWN, ENEMY_HARD_SHIELD_LEFT, ENEMY_HARD_SHIELD_RIGHT }
 
 static func is_enemy(cell: int) -> bool:
 	return cell != CellType.LIVE
 
 static func get_shield_dir(cell: int) -> Direction:
 	match cell:
-		CellType.ENEMY_SHIELD_UP:    return Direction.UP
-		CellType.ENEMY_SHIELD_DOWN:  return Direction.DOWN
-		CellType.ENEMY_SHIELD_LEFT:  return Direction.LEFT
-		CellType.ENEMY_SHIELD_RIGHT: return Direction.RIGHT
+		CellType.ENEMY_SHIELD_UP,   CellType.ENEMY_HARD_SHIELD_UP:    return Direction.UP
+		CellType.ENEMY_SHIELD_DOWN, CellType.ENEMY_HARD_SHIELD_DOWN:  return Direction.DOWN
+		CellType.ENEMY_SHIELD_LEFT, CellType.ENEMY_HARD_SHIELD_LEFT:  return Direction.LEFT
+		CellType.ENEMY_SHIELD_RIGHT,CellType.ENEMY_HARD_SHIELD_RIGHT: return Direction.RIGHT
 		_: return Direction.NONE
+
+static func is_hard_shield(cell: int) -> bool:
+	return cell == CellType.ENEMY_HARD_SHIELD_UP or cell == CellType.ENEMY_HARD_SHIELD_DOWN or \
+		cell == CellType.ENEMY_HARD_SHIELD_LEFT or cell == CellType.ENEMY_HARD_SHIELD_RIGHT
+
+static func harden_shield(cell: int) -> CellType:
+	match cell:
+		CellType.ENEMY_SHIELD_UP:    return CellType.ENEMY_HARD_SHIELD_UP
+		CellType.ENEMY_SHIELD_DOWN:  return CellType.ENEMY_HARD_SHIELD_DOWN
+		CellType.ENEMY_SHIELD_LEFT:  return CellType.ENEMY_HARD_SHIELD_LEFT
+		CellType.ENEMY_SHIELD_RIGHT: return CellType.ENEMY_HARD_SHIELD_RIGHT
+		_: return cell as CellType
 
 static func shield_enemy_for_dir(d: Direction) -> CellType:
 	match d:

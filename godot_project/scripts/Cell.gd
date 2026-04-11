@@ -40,7 +40,8 @@ func _draw() -> void:
 			var dv_f: Vector2 = Vector2(float(dv.x), float(dv.y))
 			var perp: Vector2 = Vector2(-dv_f.y, dv_f.x)
 			var sc: Vector2 = center + dv_f * (r + 10.0)
-			draw_line(sc - perp * 18.0, sc + perp * 18.0, Color(0.3, 0.65, 1.0), 5.0, true)
+			var shield_color: Color = Color(1.0, 0.75, 0.1) if CharacterData.is_hard_shield(cell_type) else Color(0.3, 0.65, 1.0)
+			draw_line(sc - perp * 18.0, sc + perp * 18.0, shield_color, 5.0, true)
 
 	if is_player:
 		var pr: float = 20.0
