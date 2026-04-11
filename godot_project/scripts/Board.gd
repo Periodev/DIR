@@ -11,6 +11,8 @@ const SEQ_GAP: float = 8.0
 const SEQ_STEP: float = SEQ_SIZE + SEQ_GAP
 const SEQ_MARGIN_TOP: float = 20.0
 const ATK_QUEUE_GAP: float = 12.0
+const SKILL_MARGIN_TOP: float = 20.0
+const SKILL_SLOTS: int = 2
 
 signal board_updated
 
@@ -26,6 +28,8 @@ var turn: int = 1
 
 var attack_queue: Array[int] = []
 var attack_queue_highlighted: int = -1
+
+var skill_slots: Array = [[], []]
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 
@@ -111,6 +115,7 @@ func restart() -> void:
 	turn = 1
 	attack_queue.clear()
 	attack_queue_highlighted = -1
+	skill_slots = [[], []]
 	_refresh_visuals()
 
 func try_move(dir: int) -> bool:
@@ -166,6 +171,30 @@ func try_end_turn() -> bool:
 func set_atk_highlight(slot: int) -> void:
 	attack_queue_highlighted = -1 if attack_queue_highlighted == slot else slot
 	queue_redraw()
+
+func try_combine_skill() -> bool:
+	if attack_queue_highlighted < 0 or attack_queue_highlighted >= attack_queue.size():
+		return false
+	if action_seq.is_empty():
+		return false
+	var dir_seq: int = action_seq[-1]
+	var dir_atk: int = attack_queue[attack_queue_highlighted]
+	# Reject opposite directions
+	if CharacterData.DIR_VECTOR[dir_seq] + CharacterData.DIR_VECTOR[dir_atk] == Vector2i.ZERO:
+		return false
+	# Find first empty skill slot
+	var empty: int = -1
+	for i: int in SKILL_SLOTS:
+		if skill_slots[i].is_empty():
+			empty = i
+			break
+	if empty < 0:
+		return false
+	skill_slots[empty] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
+	attack_queue.remove_at(attack_queue_highlighted)
+	attack_queue_highlighted = -1
+	_refresh_visuals()
+	return true
 
 func debug_spawn_enemies(count: int) -> void:
 	var available: Array[Vector2i] = []
@@ -232,6 +261,26 @@ func _draw() -> void:
 			draw_string(font, Vector2(ax, atk_text_y), atk_arrow,
 				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
 
+	# Skill slots (bottom-left)
+	var skill_y: float = atk_y + SEQ_SIZE + SKILL_MARGIN_TOP
+	var skill_font_size: int = 26
+	for i: int in SKILL_SLOTS:
+		var sx: float = i * SEQ_STEP
+		var srect: Rect2 = Rect2(sx, skill_y, SEQ_SIZE, SEQ_SIZE)
+		draw_rect(srect, Color(0.08, 0.08, 0.18))
+		draw_rect(srect, Color(0.35, 0.35, 0.65), false, 1.5)
+		if not skill_slots[i].is_empty():
+			var stext_y: float = skill_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0
+			var half: float = SEQ_SIZE / 2.0
+			var col_a: Color = Color(1.0, 0.6, 0.15) if skill_slots[i][2] else Color.WHITE
+			var col_b: Color = Color(1.0, 0.6, 0.15)
+			draw_string(font, Vector2(sx, stext_y),
+				CharacterData.DIR_ARROWS[skill_slots[i][0]],
+				HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_a)
+			draw_string(font, Vector2(sx + half, stext_y),
+				CharacterData.DIR_ARROWS[skill_slots[i][1]],
+				HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_b)
+
 	# Turn counter (right of board)
 	var side_x: float = board_w + 28.0
 	draw_string(font, Vector2(side_x, 26.0), "TURN",
@@ -241,6 +290,6 @@ func _draw() -> void:
 
 func _update_board_offset() -> void:
 	var board_w: float = (COLS - 1) * CELL_STEP + CELL_SIZE
-	var total_h: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE
+	var total_h: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE + SKILL_MARGIN_TOP + SEQ_SIZE
 	var vp: Vector2 = get_viewport_rect().size
 	position = Vector2((vp.x - board_w) / 2.0, (vp.y - total_h) / 2.0)

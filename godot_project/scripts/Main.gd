@@ -36,6 +36,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	if keycode == KEY_SPACE:
+		board.try_combine_skill()
+		get_viewport().set_input_as_handled()
+		return
+
 	if keycode == KEY_ENTER:
 		board.try_end_turn()
 		get_viewport().set_input_as_handled()
