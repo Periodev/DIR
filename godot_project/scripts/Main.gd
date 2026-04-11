@@ -22,7 +22,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	var dir: int = CharacterData.key_to_direction(keycode)
 	if dir != CharacterData.Direction.NONE:
-		board.try_move(dir)
+		if not board.try_attack(dir):
+			board.try_move(dir)
 		get_viewport().set_input_as_handled()
 		return
 

@@ -111,6 +111,20 @@ func try_move(dir: int) -> bool:
 	_refresh_visuals()
 	return true
 
+func try_attack(dir: int) -> bool:
+	if action_seq.size() >= SEQ_SLOTS:
+		return false
+	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
+	var target: Vector2i = player_pos + dv
+	if target.x < 0 or target.x >= COLS or target.y < 0 or target.y >= ROWS:
+		return false
+	if grid[target.y][target.x] != CharacterData.CellType.ENEMY:
+		return false
+	grid[target.y][target.x] = CharacterData.CellType.LIVE
+	action_seq.append(dir)
+	_refresh_visuals()
+	return true
+
 func try_end_turn() -> bool:
 	turn += 1
 	action_seq.clear()
