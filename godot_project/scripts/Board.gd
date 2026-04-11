@@ -59,7 +59,7 @@ class ArrowOverlay extends Node2D:
 			var neighbor: Vector2i = board.player_pos + dv
 			if neighbor.x < 0 or neighbor.x >= COLS_ or neighbor.y < 0 or neighbor.y >= ROWS_:
 				continue
-			if board.grid[neighbor.y][neighbor.x] != CharacterData.CellType.ENEMY:
+			if not CharacterData.is_enemy(board.grid[neighbor.y][neighbor.x]):
 				continue
 
 			var dv_f: Vector2 = Vector2(float(dv.x), float(dv.y))
@@ -162,8 +162,12 @@ func try_attack(dir: int) -> bool:
 	var target: Vector2i = player_pos + dv
 	if target.x < 0 or target.x >= COLS or target.y < 0 or target.y >= ROWS:
 		return false
-	if grid[target.y][target.x] != CharacterData.CellType.ENEMY:
+	if not CharacterData.is_enemy(grid[target.y][target.x]):
 		return false
+	var shield_dir: int = CharacterData.get_shield_dir(grid[target.y][target.x])
+	if shield_dir != CharacterData.Direction.NONE:
+		if CharacterData.DIR_VECTOR[dir] + CharacterData.DIR_VECTOR[shield_dir] == Vector2i.ZERO:
+			return false  # attack blocked by shield
 	grid[target.y][target.x] = CharacterData.CellType.LIVE
 	kill_count += 1
 	action_seq.append(dir)
@@ -223,7 +227,9 @@ func debug_spawn_enemies(count: int) -> void:
 				available.append(pos)
 	available.shuffle()
 	for i: int in mini(count, available.size()):
-		grid[available[i].y][available[i].x] = CharacterData.CellType.ENEMY
+		var epos: Vector2i = available[i]
+		var sd: int = CharacterData.dominant_cardinal(player_pos - epos)
+		grid[epos.y][epos.x] = CharacterData.shield_enemy_for_dir(sd)
 	_refresh_visuals()
 
 func _refresh_visuals() -> void:
@@ -328,7 +334,7 @@ func _in_bounds(p: Vector2i) -> bool:
 func _remove_enemy(p: Vector2i) -> void:
 	if not _in_bounds(p):
 		return
-	if grid[p.y][p.x] == CharacterData.CellType.ENEMY:
+	if CharacterData.is_enemy(grid[p.y][p.x]):
 		grid[p.y][p.x] = CharacterData.CellType.LIVE
 		kill_count += 1
 

@@ -1,7 +1,34 @@
 class_name CharacterData
 
 enum Direction { NONE = 0, UP = 1, DOWN = 2, LEFT = 3, RIGHT = 4 }
-enum CellType { LIVE, ENEMY }
+enum CellType { LIVE, ENEMY, ENEMY_SHIELD_UP, ENEMY_SHIELD_DOWN, ENEMY_SHIELD_LEFT, ENEMY_SHIELD_RIGHT }
+
+static func is_enemy(cell: int) -> bool:
+	return cell != CellType.LIVE
+
+static func get_shield_dir(cell: int) -> Direction:
+	match cell:
+		CellType.ENEMY_SHIELD_UP:    return Direction.UP
+		CellType.ENEMY_SHIELD_DOWN:  return Direction.DOWN
+		CellType.ENEMY_SHIELD_LEFT:  return Direction.LEFT
+		CellType.ENEMY_SHIELD_RIGHT: return Direction.RIGHT
+		_: return Direction.NONE
+
+static func shield_enemy_for_dir(d: Direction) -> CellType:
+	match d:
+		Direction.UP:    return CellType.ENEMY_SHIELD_UP
+		Direction.DOWN:  return CellType.ENEMY_SHIELD_DOWN
+		Direction.LEFT:  return CellType.ENEMY_SHIELD_LEFT
+		Direction.RIGHT: return CellType.ENEMY_SHIELD_RIGHT
+		_: return CellType.ENEMY
+
+static func dominant_cardinal(diff: Vector2i) -> Direction:
+	if diff == Vector2i.ZERO:
+		return Direction.NONE
+	if abs(diff.x) >= abs(diff.y):
+		return Direction.RIGHT if diff.x > 0 else Direction.LEFT
+	else:
+		return Direction.DOWN if diff.y > 0 else Direction.UP
 
 class Config:
 	var seq_slots: int = 3

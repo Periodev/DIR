@@ -21,7 +21,7 @@ func _draw() -> void:
 
 	var center: Vector2 = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
 
-	if cell_type == CharacterData.CellType.ENEMY:
+	if CharacterData.is_enemy(cell_type):
 		var r: float = 28.0
 		var oct: PackedVector2Array = PackedVector2Array([
 			center + Vector2(0.0,       -r),
@@ -34,6 +34,13 @@ func _draw() -> void:
 			center + Vector2(-r * 0.7, -r * 0.7),
 		])
 		draw_polygon(oct, PackedColorArray([Color(0.8, 0.15, 0.15)]))
+		var shield_dir: int = CharacterData.get_shield_dir(cell_type)
+		if shield_dir != CharacterData.Direction.NONE:
+			var dv: Vector2i = CharacterData.DIR_VECTOR[shield_dir]
+			var dv_f: Vector2 = Vector2(float(dv.x), float(dv.y))
+			var perp: Vector2 = Vector2(-dv_f.y, dv_f.x)
+			var sc: Vector2 = center + dv_f * (r + 10.0)
+			draw_line(sc - perp * 18.0, sc + perp * 18.0, Color(0.3, 0.65, 1.0), 5.0, true)
 
 	if is_player:
 		var pr: float = 20.0
