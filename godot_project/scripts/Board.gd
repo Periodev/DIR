@@ -183,7 +183,7 @@ func try_end_turn() -> bool:
 	action_seq_is_attack.clear()
 	moves_this_turn = 0
 	attacks_this_turn = 0
-	debug_spawn_enemies(2)
+	debug_spawn_enemies(3)
 	return true
 
 func set_atk_highlight(slot: int) -> void:
