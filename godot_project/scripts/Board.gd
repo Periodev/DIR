@@ -168,8 +168,11 @@ func try_attack(dir: int) -> bool:
 	if shield_dir != CharacterData.Direction.NONE:
 		if CharacterData.DIR_VECTOR[dir] + CharacterData.DIR_VECTOR[shield_dir] == Vector2i.ZERO:
 			return false  # attack blocked by shield
-	grid[target.y][target.x] = CharacterData.CellType.LIVE
-	kill_count += 1
+	if grid[target.y][target.x] == CharacterData.CellType.ENEMY:
+		grid[target.y][target.x] = CharacterData.CellType.LIVE
+		kill_count += 1
+	else:
+		grid[target.y][target.x] = CharacterData.CellType.ENEMY  # strip shield
 	action_seq.append(dir)
 	action_seq_is_attack.append(true)
 	attacks_this_turn += 1
