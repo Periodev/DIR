@@ -19,3 +19,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		board.debug_spawn_enemies(2)
 		get_viewport().set_input_as_handled()
 		return
+
+	var dir: int = CharacterData.key_to_direction(keycode)
+	if dir != CharacterData.Direction.NONE:
+		board.try_move(dir)
+		get_viewport().set_input_as_handled()
+		return
+
+	if keycode == KEY_ENTER:
+		board.try_end_turn()
+		get_viewport().set_input_as_handled()
+		return
