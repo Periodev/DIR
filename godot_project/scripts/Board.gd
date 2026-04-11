@@ -10,6 +10,7 @@ const SEQ_SIZE: float = 85.0
 const SEQ_GAP: float = 8.0
 const SEQ_STEP: float = SEQ_SIZE + SEQ_GAP
 const SEQ_MARGIN_TOP: float = 20.0
+const ATK_QUEUE_GAP: float = 12.0
 
 signal board_updated
 
@@ -22,6 +23,9 @@ var action_seq_is_attack: Array[bool] = []
 var moves_this_turn: int = 0
 var attacks_this_turn: int = 0
 var turn: int = 1
+
+var attack_queue: Array[int] = []
+var attack_queue_highlighted: int = -1
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 
@@ -105,6 +109,8 @@ func restart() -> void:
 	moves_this_turn = 0
 	attacks_this_turn = 0
 	turn = 1
+	attack_queue.clear()
+	attack_queue_highlighted = -1
 	_refresh_visuals()
 
 func try_move(dir: int) -> bool:
@@ -144,6 +150,11 @@ func try_attack(dir: int) -> bool:
 	return true
 
 func try_end_turn() -> bool:
+	for i: int in action_seq.size():
+		if action_seq_is_attack[i]:
+			attack_queue.append(action_seq[i])
+	while attack_queue.size() > char_config.max_attacks:
+		attack_queue.pop_front()
 	turn += 1
 	action_seq.clear()
 	action_seq_is_attack.clear()
@@ -151,6 +162,10 @@ func try_end_turn() -> bool:
 	attacks_this_turn = 0
 	_refresh_visuals()
 	return true
+
+func set_atk_highlight(slot: int) -> void:
+	attack_queue_highlighted = -1 if attack_queue_highlighted == slot else slot
+	queue_redraw()
 
 func debug_spawn_enemies(count: int) -> void:
 	var available: Array[Vector2i] = []
@@ -198,6 +213,25 @@ func _draw() -> void:
 			draw_string(font, Vector2(x, text_y), arrow,
 				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
 
+	# Attack queue row
+	var atk_slots: int = char_config.max_attacks
+	var total_atk_w: float = (atk_slots - 1) * SEQ_STEP + SEQ_SIZE
+	var atk_x0: float = (board_w - total_atk_w) / 2.0
+	var atk_y: float = seq_y + SEQ_SIZE + ATK_QUEUE_GAP
+
+	for i: int in atk_slots:
+		var ax: float = atk_x0 + i * SEQ_STEP
+		var arect: Rect2 = Rect2(ax, atk_y, SEQ_SIZE, SEQ_SIZE)
+		var is_hl: bool = i == attack_queue_highlighted
+		draw_rect(arect, Color(0.16, 0.09, 0.04) if is_hl else Color(0.10, 0.10, 0.13))
+		draw_rect(arect, Color(1.0, 0.6, 0.15) if is_hl else Color(0.40, 0.25, 0.08), false,
+			2.5 if is_hl else 1.5)
+		if i < attack_queue.size():
+			var atk_arrow: String = CharacterData.DIR_ARROWS[attack_queue[i]]
+			var atk_text_y: float = atk_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+			draw_string(font, Vector2(ax, atk_text_y), atk_arrow,
+				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
+
 	# Turn counter (right of board)
 	var side_x: float = board_w + 28.0
 	draw_string(font, Vector2(side_x, 26.0), "TURN",
@@ -207,6 +241,6 @@ func _draw() -> void:
 
 func _update_board_offset() -> void:
 	var board_w: float = (COLS - 1) * CELL_STEP + CELL_SIZE
-	var total_h: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE
+	var total_h: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE
 	var vp: Vector2 = get_viewport_rect().size
 	position = Vector2((vp.x - board_w) / 2.0, (vp.y - total_h) / 2.0)

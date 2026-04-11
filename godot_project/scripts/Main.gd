@@ -20,6 +20,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	if keycode == KEY_1:
+		board.set_atk_highlight(0)
+		get_viewport().set_input_as_handled()
+		return
+	if keycode == KEY_2:
+		board.set_atk_highlight(1)
+		get_viewport().set_input_as_handled()
+		return
+
 	var dir: int = CharacterData.key_to_direction(keycode)
 	if dir != CharacterData.Direction.NONE:
 		if not board.try_attack(dir):
