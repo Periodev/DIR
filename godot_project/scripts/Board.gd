@@ -21,6 +21,48 @@ var turn: int = 1
 
 var cell_nodes: Array[Array] = []
 var _cell_scene: PackedScene = null
+var _arrow_overlay: Node2D = null
+
+class ArrowOverlay extends Node2D:
+	var board: Node2D
+	func _draw() -> void:
+		if board == null:
+			return
+		var ARROW_HALF: float = 26.0
+		var HEAD_ARM: float = 18.0
+		var LINE_W: float = 3.5
+		var COLOR: Color = Color(1.0, 0.6, 0.15, 0.95)
+		var COLS_: int = board.COLS
+		var ROWS_: int = board.ROWS
+		var CELL_SIZE_: float = board.CELL_SIZE
+		var CELL_GAP_: float = board.CELL_GAP
+		var CELL_STEP_: float = board.CELL_STEP
+
+		for dir_id: int in CharacterData.DIR_VECTOR:
+			var dv: Vector2i = CharacterData.DIR_VECTOR[dir_id]
+			var neighbor: Vector2i = board.player_pos + dv
+			if neighbor.x < 0 or neighbor.x >= COLS_ or neighbor.y < 0 or neighbor.y >= ROWS_:
+				continue
+			if board.grid[neighbor.y][neighbor.x] != CharacterData.CellType.ENEMY:
+				continue
+
+			var dv_f: Vector2 = Vector2(float(dv.x), float(dv.y))
+			var perp: Vector2 = Vector2(-dv_f.y, dv_f.x)
+			var player_center: Vector2 = Vector2(
+				board.player_pos.x * CELL_STEP_ + CELL_SIZE_ / 2.0,
+				board.player_pos.y * CELL_STEP_ + CELL_SIZE_ / 2.0
+			)
+			var gap_center: Vector2 = player_center + dv_f * (CELL_SIZE_ / 2.0 + CELL_GAP_ / 2.0)
+			var tail: Vector2 = gap_center - dv_f * ARROW_HALF
+			var tip: Vector2 = gap_center + dv_f * ARROW_HALF
+			var shaft_end: Vector2 = tip - dv_f * HEAD_ARM
+
+			# Shaft
+			draw_line(tail, shaft_end, COLOR, LINE_W, true)
+			# L-shaped head: two lines at 90° meeting at tip
+			var top_pt: Vector2 = shaft_end - perp * HEAD_ARM
+			var bot_pt: Vector2 = shaft_end + perp * HEAD_ARM
+			draw_polyline(PackedVector2Array([top_pt, tip, bot_pt]), COLOR, LINE_W, true)
 
 func _ready() -> void:
 	_cell_scene = load("res://scenes/Cell.tscn")
@@ -34,6 +76,10 @@ func _ready() -> void:
 			add_child(cell)
 			row_nodes.append(cell)
 		cell_nodes.append(row_nodes)
+
+	_arrow_overlay = ArrowOverlay.new()
+	_arrow_overlay.board = self
+	add_child(_arrow_overlay)
 
 	get_viewport().size_changed.connect(_update_board_offset)
 	_update_board_offset()
@@ -89,6 +135,8 @@ func _refresh_visuals() -> void:
 			cell_nodes[r][c].set_type(grid[r][c])
 			cell_nodes[r][c].set_player(Vector2i(c, r) == player_pos)
 	queue_redraw()
+	if _arrow_overlay:
+		_arrow_overlay.queue_redraw()
 	board_updated.emit()
 
 func _draw() -> void:
