@@ -31,6 +31,7 @@ var attack_queue_highlighted: int = -1
 
 var skill_slots: Array = [[], []]
 var skill_preview: int = -1  # -1 = none, 0/1 = slot index being held
+var kill_count: int = 0
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 
@@ -131,6 +132,7 @@ func restart() -> void:
 	attack_queue_highlighted = -1
 	skill_slots = [[], []]
 	skill_preview = -1
+	kill_count = 0
 	_refresh_visuals()
 
 func try_move(dir: int) -> bool:
@@ -163,6 +165,7 @@ func try_attack(dir: int) -> bool:
 	if grid[target.y][target.x] != CharacterData.CellType.ENEMY:
 		return false
 	grid[target.y][target.x] = CharacterData.CellType.LIVE
+	kill_count += 1
 	action_seq.append(dir)
 	action_seq_is_attack.append(true)
 	attacks_this_turn += 1
@@ -180,7 +183,7 @@ func try_end_turn() -> bool:
 	action_seq_is_attack.clear()
 	moves_this_turn = 0
 	attacks_this_turn = 0
-	_refresh_visuals()
+	debug_spawn_enemies(2)
 	return true
 
 func set_atk_highlight(slot: int) -> void:
@@ -302,12 +305,16 @@ func _draw() -> void:
 			draw_string(font, Vector2(sx, skill_y + SEQ_SIZE - 2.0), type_name,
 				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
 
-	# Turn counter (right of board)
+	# Turn counter + kill count (right of board)
 	var side_x: float = board_w + 28.0
 	draw_string(font, Vector2(side_x, 26.0), "TURN",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
 	draw_string(font, Vector2(side_x, 66.0), str(turn),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color.WHITE)
+	draw_string(font, Vector2(side_x, 100.0), "KILL",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+	draw_string(font, Vector2(side_x, 140.0), str(kill_count),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color(1.0, 0.4, 0.4))
 
 func _update_board_offset() -> void:
 	var board_w: float = (COLS - 1) * CELL_STEP + CELL_SIZE
@@ -323,6 +330,7 @@ func _remove_enemy(p: Vector2i) -> void:
 		return
 	if grid[p.y][p.x] == CharacterData.CellType.ENEMY:
 		grid[p.y][p.x] = CharacterData.CellType.LIVE
+		kill_count += 1
 
 func get_skill_preview_cells(slot: int) -> Dictionary:
 	var result: Dictionary = {"move": [], "hit": []}
