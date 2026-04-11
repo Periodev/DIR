@@ -431,8 +431,17 @@ func use_skill(slot: int) -> void:
 		CharacterData.SkillType.SAME_MA:
 			var move_target: Vector2i = pos + dv_seq
 			if _in_bounds(move_target):
-				_hit_cell(move_target, slot_data[0])
-				player_pos = move_target
+				if CharacterData.is_enemy(grid[move_target.y][move_target.x]):
+					_hit_cell(move_target, slot_data[0])  # 第一擊：殺或破盾
+					if CharacterData.is_enemy(grid[move_target.y][move_target.x]):
+						# 盾被破，敵人仍在 → 推動
+						var push_dest: Vector2i = move_target + dv_seq
+						if not _in_bounds(push_dest) or CharacterData.is_enemy(grid[push_dest.y][push_dest.x]):
+							_hit_cell(move_target, CharacterData.opposite_dir(slot_data[0]))  # 擠壓必殺
+						else:
+							grid[push_dest.y][push_dest.x] = grid[move_target.y][move_target.x]
+							grid[move_target.y][move_target.x] = CharacterData.CellType.LIVE
+				player_pos = move_target  # 流程後 move_target 必為空
 		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
 			var move_target: Vector2i = pos + dv_seq
 			if _in_bounds(move_target) and grid[move_target.y][move_target.x] == CharacterData.CellType.LIVE:

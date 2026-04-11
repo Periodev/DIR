@@ -30,6 +30,14 @@ static func dominant_cardinal(diff: Vector2i) -> Direction:
 	else:
 		return Direction.DOWN if diff.y > 0 else Direction.UP
 
+static func opposite_dir(d: Direction) -> Direction:
+	match d:
+		Direction.UP:    return Direction.DOWN
+		Direction.DOWN:  return Direction.UP
+		Direction.LEFT:  return Direction.RIGHT
+		Direction.RIGHT: return Direction.LEFT
+		_: return Direction.NONE
+
 class Config:
 	var seq_slots: int = 3
 	var max_moves: int = 3
