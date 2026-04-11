@@ -344,7 +344,8 @@ func get_skill_preview_cells(slot: int) -> Dictionary:
 	match stype:
 		CharacterData.SkillType.SAME_MA:
 			result["move"].append(pos + dv_seq)
-			result["hit"].append(pos + dv_seq)
+			if _in_bounds(pos + 2 * dv_seq):
+				result["hit"].append(pos + 2 * dv_seq)
 		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
 			result["move"].append(pos + dv_seq)
 			result["hit"].append(pos + dv_seq + dv_atk)
@@ -358,8 +359,6 @@ func get_skill_preview_cells(slot: int) -> Dictionary:
 				result["hit"].append(pos + dv_seq)
 			if _in_bounds(pos + dv_atk):
 				result["hit"].append(pos + dv_atk)
-			if _in_bounds(pos + dv_seq + dv_atk):
-				result["hit"].append(pos + dv_seq + dv_atk)
 	return result
 
 func set_skill_preview(slot: int) -> void:
@@ -412,8 +411,10 @@ func use_skill(slot: int) -> void:
 	var pos: Vector2i = player_pos
 	match stype:
 		CharacterData.SkillType.SAME_MA:
-			_remove_enemy(pos + dv_seq)
-			player_pos = pos + dv_seq
+			var move_target: Vector2i = pos + dv_seq
+			if _in_bounds(move_target) and grid[move_target.y][move_target.x] == CharacterData.CellType.LIVE:
+				player_pos = move_target
+				_remove_enemy(player_pos + dv_atk)
 		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
 			var move_target: Vector2i = pos + dv_seq
 			if _in_bounds(move_target) and grid[move_target.y][move_target.x] == CharacterData.CellType.LIVE:
@@ -425,6 +426,5 @@ func use_skill(slot: int) -> void:
 		CharacterData.SkillType.ORTHO_AA:
 			_remove_enemy(pos + dv_seq)
 			_remove_enemy(pos + dv_atk)
-			_remove_enemy(pos + dv_seq + dv_atk)
 	skill_slots[slot] = []
 	_refresh_visuals()
