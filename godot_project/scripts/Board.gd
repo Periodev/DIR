@@ -1,7 +1,7 @@
 extends Node2D
 
-const COLS: int = 4
-const ROWS: int = 4
+const COLS: int = 5
+const ROWS: int = 5
 const CELL_SIZE: float = 100.0
 const CELL_GAP: float = 8.0
 const CELL_STEP: float = CELL_SIZE + CELL_GAP
@@ -203,7 +203,7 @@ func try_end_turn() -> bool:
 	for i: int in action_seq.size():
 		if action_seq_is_attack[i]:
 			attack_queue.append(action_seq[i])
-	while attack_queue.size() > char_config.max_attacks:
+	while attack_queue.size() > char_config.attack_queue_cap:
 		attack_queue.pop_front()
 	turn += 1
 	action_seq.clear()
@@ -327,7 +327,7 @@ func _draw() -> void:
 		skill_y = seq_y + SEQ_SIZE + SKILL_MARGIN_TOP
 	else:
 		# Attack queue row
-		var atk_slots: int = char_config.max_attacks
+		var atk_slots: int = char_config.attack_queue_cap
 		var total_atk_w: float = (atk_slots - 1) * SEQ_STEP + SEQ_SIZE
 		var atk_x0: float = (board_w - total_atk_w) / 2.0
 		var atk_y: float = seq_y + SEQ_SIZE + ATK_QUEUE_GAP
@@ -394,6 +394,13 @@ func _classify(slot_data: Array) -> int:
 
 func _in_bounds(p: Vector2i) -> bool:
 	return p.x >= 0 and p.x < COLS and p.y >= 0 and p.y < ROWS
+
+func _has_adjacent_enemy(p: Vector2i) -> bool:
+	for dv: Vector2i in CharacterData.DIR_VECTOR.values():
+		var n: Vector2i = p + dv
+		if _in_bounds(n) and CharacterData.is_enemy(grid[n.y][n.x]):
+			return true
+	return false
 
 func _remove_enemy(p: Vector2i) -> void:
 	if not _in_bounds(p):
@@ -560,5 +567,8 @@ func use_skill(slot: int) -> void:
 			var jump_dest: Vector2i = pos + dv_seq + dv_atk
 			if _in_bounds(jump_dest) and not CharacterData.is_enemy(grid[jump_dest.y][jump_dest.x]):
 				player_pos = jump_dest
+	if stype == CharacterData.SkillType.RDR_DASH or stype == CharacterData.SkillType.RDR_DIAG:
+		if _has_adjacent_enemy(player_pos):
+			bonus_attacks += 1
 	skill_slots[slot] = []
 	_refresh_visuals()

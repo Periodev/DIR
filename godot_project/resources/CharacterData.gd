@@ -58,6 +58,7 @@ class Config:
 	var teleport_on_kill: bool = false
 	var skill_mixed: bool = false
 	var use_rdr_classifier: bool = false
+	var attack_queue_cap: int = 3
 
 const DIR_VECTOR: Dictionary = {
 	Direction.UP:    Vector2i(0, -1),
