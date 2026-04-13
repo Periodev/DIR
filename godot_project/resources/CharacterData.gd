@@ -55,6 +55,9 @@ class Config:
 	var seq_slots: int = 3
 	var max_moves: int = 3
 	var max_attacks: int = 3
+	var teleport_on_kill: bool = false
+	var skill_mixed: bool = false
+	var use_rdr_classifier: bool = false
 
 const DIR_VECTOR: Dictionary = {
 	Direction.UP:    Vector2i(0, -1),
@@ -79,7 +82,8 @@ static func key_to_direction(keycode: Key) -> Direction:
 		KEY_RIGHT, KEY_D: return Direction.RIGHT
 		_: return Direction.NONE
 
-enum SkillType { NONE, SAME_MA, LEFT_MA, RIGHT_MA, SAME_AA, ORTHO_AA }
+enum SkillType { NONE, SAME_MA, LEFT_MA, RIGHT_MA, SAME_AA, ORTHO_AA,
+	RDR_DASH, RDR_DIAG }
 
 const SKILL_TYPE_NAMES: Dictionary = {
 	SkillType.NONE:     "",
@@ -88,7 +92,15 @@ const SKILL_TYPE_NAMES: Dictionary = {
 	SkillType.RIGHT_MA: "右勾",
 	SkillType.SAME_AA:  "同向AA",
 	SkillType.ORTHO_AA: "正交AA",
+	SkillType.RDR_DASH: "突進",
+	SkillType.RDR_DIAG: "斜跳",
 }
+
+static func classify_skill_rdr(slot_data: Array) -> SkillType:
+	if slot_data.is_empty(): return SkillType.NONE
+	var dir1: int = slot_data[0]
+	var dir2: int = slot_data[1]
+	return SkillType.RDR_DASH if dir1 == dir2 else SkillType.RDR_DIAG
 
 static func classify_skill(slot_data: Array) -> SkillType:
 	if slot_data.is_empty():

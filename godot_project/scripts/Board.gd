@@ -17,6 +17,7 @@ const SKILL_SLOTS: int = 2
 signal board_updated
 
 var char_config: CharacterData.Config = null
+var _char_index: int = 0   # 0=EXE, 1=RDR
 
 var grid: Array[Array] = []
 var player_pos: Vector2i = Vector2i(COLS / 2, ROWS / 2)
@@ -24,6 +25,8 @@ var action_seq: Array[int] = []
 var action_seq_is_attack: Array[bool] = []
 var moves_this_turn: int = 0
 var attacks_this_turn: int = 0
+var bonus_moves: int = 0
+var bonus_attacks: int = 0
 var turn: int = 1
 
 var attack_queue: Array[int] = []
@@ -35,6 +38,7 @@ var kill_count: int = 0
 var shield_spawn_turn: Dictionary = {}  # Vector2i -> int (turn when spawned)
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
+const _RDR_SCRIPT = preload("res://scripts/CharacterImpl_RDR.gd")
 
 var cell_nodes: Array[Array] = []
 var _cell_scene: PackedScene = null
@@ -94,8 +98,15 @@ class ArrowOverlay extends Node2D:
 						draw_rect(Rect2(p.x * CELL_STEP_, p.y * CELL_STEP_, CELL_SIZE_, CELL_SIZE_),
 							Color(1.0, 0.3, 0.3, 0.4))
 
+func _load_char_config() -> void:
+	char_config = ([_EXE_SCRIPT, _RDR_SCRIPT][_char_index]).get_config()
+
+func switch_character() -> void:
+	_char_index = (_char_index + 1) % 2
+	restart()
+
 func _ready() -> void:
-	char_config = _EXE_SCRIPT.get_config()
+	_load_char_config()
 	_cell_scene = load("res://scenes/Cell.tscn")
 
 	for r: int in ROWS:
@@ -117,6 +128,7 @@ func _ready() -> void:
 	restart()
 
 func restart() -> void:
+	_load_char_config()
 	grid.clear()
 	for _r: int in ROWS:
 		var row: Array[int] = []
@@ -128,6 +140,8 @@ func restart() -> void:
 	action_seq_is_attack.clear()
 	moves_this_turn = 0
 	attacks_this_turn = 0
+	bonus_moves = 0
+	bonus_attacks = 0
 	turn = 1
 	attack_queue.clear()
 	attack_queue_highlighted = -1
@@ -140,7 +154,7 @@ func restart() -> void:
 func try_move(dir: int) -> bool:
 	if action_seq.size() >= char_config.seq_slots:
 		return false
-	if moves_this_turn >= char_config.max_moves:
+	if moves_this_turn >= char_config.max_moves + bonus_moves:
 		return false
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var target: Vector2i = player_pos + dv
@@ -158,7 +172,7 @@ func try_move(dir: int) -> bool:
 func try_attack(dir: int) -> bool:
 	if action_seq.size() >= char_config.seq_slots:
 		return false
-	if attacks_this_turn >= char_config.max_attacks:
+	if attacks_this_turn >= char_config.max_attacks + bonus_attacks:
 		return false
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var target: Vector2i = player_pos + dv
@@ -175,8 +189,12 @@ func try_attack(dir: int) -> bool:
 	else:
 		grid[target.y][target.x] = CharacterData.CellType.LIVE   # unshielded side → kill
 		kill_count += 1
-	action_seq.append(dir)
-	action_seq_is_attack.append(true)
+		if char_config.teleport_on_kill:
+			player_pos = target
+	var killed: bool = grid[target.y][target.x] == CharacterData.CellType.LIVE
+	if not char_config.use_rdr_classifier or killed:
+		action_seq.append(dir)
+		action_seq_is_attack.append(true)
 	attacks_this_turn += 1
 	_refresh_visuals()
 	return true
@@ -192,6 +210,8 @@ func try_end_turn() -> bool:
 	action_seq_is_attack.clear()
 	moves_this_turn = 0
 	attacks_this_turn = 0
+	bonus_moves = 0
+	bonus_attacks = 0
 	_harden_old_shields()
 	debug_spawn_enemies(3)
 	return true
@@ -201,6 +221,8 @@ func set_atk_highlight(slot: int) -> void:
 	queue_redraw()
 
 func try_combine_skill() -> bool:
+	if char_config.skill_mixed:
+		return _try_combine_skill_mixed()
 	if attack_queue_highlighted < 0 or attack_queue_highlighted >= attack_queue.size():
 		return false
 	if action_seq.is_empty():
@@ -224,6 +246,25 @@ func try_combine_skill() -> bool:
 	_refresh_visuals()
 	return true
 
+func _try_combine_skill_mixed() -> bool:
+	if action_seq.size() < 2:
+		return false
+	var dir1: int = action_seq[-2]
+	var dir2: int = action_seq[-1]
+	# Reject opposite directions
+	if CharacterData.DIR_VECTOR[dir1] + CharacterData.DIR_VECTOR[dir2] == Vector2i.ZERO:
+		return false
+	var empty: int = -1
+	for i: int in SKILL_SLOTS:
+		if skill_slots[i].is_empty():
+			empty = i
+			break
+	if empty < 0:
+		return false
+	skill_slots[empty] = [dir1, dir2, false]
+	_refresh_visuals()
+	return true
+
 func debug_spawn_enemies(count: int) -> void:
 	var available: Array[Vector2i] = []
 	for r: int in ROWS:
@@ -234,9 +275,7 @@ func debug_spawn_enemies(count: int) -> void:
 	available.shuffle()
 	for i: int in mini(count, available.size()):
 		var epos: Vector2i = available[i]
-		var sd: int = CharacterData.dominant_cardinal(player_pos - epos)
-		grid[epos.y][epos.x] = CharacterData.shield_enemy_for_dir(sd)
-		shield_spawn_turn[epos] = turn
+		grid[epos.y][epos.x] = CharacterData.CellType.ENEMY
 	_refresh_visuals()
 
 func _refresh_visuals() -> void:
@@ -259,6 +298,15 @@ func _draw() -> void:
 	var seq_x0: float = (board_w - total_seq_w) / 2.0
 	var seq_y: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP
 
+	# Move / attack remaining counter (left of sequence)
+	var rem_moves: int = char_config.max_moves + bonus_moves - moves_this_turn
+	var rem_atk: int = char_config.max_attacks + bonus_attacks - attacks_this_turn
+	var cx: float = seq_x0 - 70.0
+	draw_string(font, Vector2(cx, seq_y + 28.0), str(rem_moves) + "M",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
+	draw_string(font, Vector2(cx, seq_y + 58.0), str(rem_atk) + "A",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1.0, 0.6, 0.15))
+
 	# Action sequence slots
 	for i: int in slots:
 		var x: float = seq_x0 + i * SEQ_STEP
@@ -273,27 +321,31 @@ func _draw() -> void:
 			draw_string(font, Vector2(x, text_y), arrow,
 				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
 
-	# Attack queue row
-	var atk_slots: int = char_config.max_attacks
-	var total_atk_w: float = (atk_slots - 1) * SEQ_STEP + SEQ_SIZE
-	var atk_x0: float = (board_w - total_atk_w) / 2.0
-	var atk_y: float = seq_y + SEQ_SIZE + ATK_QUEUE_GAP
-
-	for i: int in atk_slots:
-		var ax: float = atk_x0 + i * SEQ_STEP
-		var arect: Rect2 = Rect2(ax, atk_y, SEQ_SIZE, SEQ_SIZE)
-		var is_hl: bool = i == attack_queue_highlighted
-		draw_rect(arect, Color(0.16, 0.09, 0.04) if is_hl else Color(0.10, 0.10, 0.13))
-		draw_rect(arect, Color(1.0, 0.6, 0.15) if is_hl else Color(0.40, 0.25, 0.08), false,
-			2.5 if is_hl else 1.5)
-		if i < attack_queue.size():
-			var atk_arrow: String = CharacterData.DIR_ARROWS[attack_queue[i]]
-			var atk_text_y: float = atk_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-			draw_string(font, Vector2(ax, atk_text_y), atk_arrow,
-				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
-
 	# Skill slots (bottom-left)
-	var skill_y: float = atk_y + SEQ_SIZE + SKILL_MARGIN_TOP
+	var skill_y: float
+	if char_config.skill_mixed:
+		skill_y = seq_y + SEQ_SIZE + SKILL_MARGIN_TOP
+	else:
+		# Attack queue row
+		var atk_slots: int = char_config.max_attacks
+		var total_atk_w: float = (atk_slots - 1) * SEQ_STEP + SEQ_SIZE
+		var atk_x0: float = (board_w - total_atk_w) / 2.0
+		var atk_y: float = seq_y + SEQ_SIZE + ATK_QUEUE_GAP
+
+		for i: int in atk_slots:
+			var ax: float = atk_x0 + i * SEQ_STEP
+			var arect: Rect2 = Rect2(ax, atk_y, SEQ_SIZE, SEQ_SIZE)
+			var is_hl: bool = i == attack_queue_highlighted
+			draw_rect(arect, Color(0.16, 0.09, 0.04) if is_hl else Color(0.10, 0.10, 0.13))
+			draw_rect(arect, Color(1.0, 0.6, 0.15) if is_hl else Color(0.40, 0.25, 0.08), false,
+				2.5 if is_hl else 1.5)
+			if i < attack_queue.size():
+				var atk_arrow: String = CharacterData.DIR_ARROWS[attack_queue[i]]
+				var atk_text_y: float = atk_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+				draw_string(font, Vector2(ax, atk_text_y), atk_arrow,
+					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
+
+		skill_y = atk_y + SEQ_SIZE + SKILL_MARGIN_TOP
 	var skill_font_size: int = 26
 	for i: int in SKILL_SLOTS:
 		var sx: float = i * SEQ_STEP
@@ -305,7 +357,7 @@ func _draw() -> void:
 		if not skill_slots[i].is_empty():
 			var stext_y: float = skill_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0 - 8.0
 			var half: float = SEQ_SIZE / 2.0
-			var col_a: Color = Color(1.0, 0.6, 0.15) if skill_slots[i][2] else Color.WHITE
+			var col_a: Color = Color(1.0, 0.6, 0.15) if (skill_slots[i].size() > 2 and skill_slots[i][2]) else Color.WHITE
 			var col_b: Color = Color(1.0, 0.6, 0.15)
 			draw_string(font, Vector2(sx, stext_y),
 				CharacterData.DIR_ARROWS[skill_slots[i][0]],
@@ -313,7 +365,7 @@ func _draw() -> void:
 			draw_string(font, Vector2(sx + half, stext_y),
 				CharacterData.DIR_ARROWS[skill_slots[i][1]],
 				HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_b)
-			var stype: int = CharacterData.classify_skill(skill_slots[i])
+			var stype: int = _classify(skill_slots[i])
 			var type_name: String = CharacterData.SKILL_TYPE_NAMES[stype]
 			draw_string(font, Vector2(sx, skill_y + SEQ_SIZE - 2.0), type_name,
 				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
@@ -334,6 +386,11 @@ func _update_board_offset() -> void:
 	var total_h: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE + SKILL_MARGIN_TOP + SEQ_SIZE
 	var vp: Vector2 = get_viewport_rect().size
 	position = Vector2((vp.x - board_w) / 2.0, (vp.y - total_h) / 2.0)
+
+func _classify(slot_data: Array) -> int:
+	if char_config.use_rdr_classifier:
+		return CharacterData.classify_skill_rdr(slot_data)
+	return CharacterData.classify_skill(slot_data)
 
 func _in_bounds(p: Vector2i) -> bool:
 	return p.x >= 0 and p.x < COLS and p.y >= 0 and p.y < ROWS
@@ -370,13 +427,16 @@ func _hit_cell(p: Vector2i, attack_dir: int) -> void:
 		grid[p.y][p.x] = CharacterData.CellType.LIVE
 		kill_count += 1
 		shield_spawn_turn.erase(p)
+		if char_config.teleport_on_kill:
+			player_pos = p
+			bonus_moves += 1
 
 func get_skill_preview_cells(slot: int) -> Dictionary:
 	var result: Dictionary = {"move": [], "hit": []}
 	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
 		return result
 	var slot_data: Array = skill_slots[slot]
-	var stype: int = CharacterData.classify_skill(slot_data)
+	var stype: int = _classify(slot_data)
 	var dv_seq: Vector2i = CharacterData.DIR_VECTOR[slot_data[0]]
 	var dv_atk: Vector2i = CharacterData.DIR_VECTOR[slot_data[1]]
 	var pos: Vector2i = player_pos
@@ -397,6 +457,14 @@ func get_skill_preview_cells(slot: int) -> Dictionary:
 				result["hit"].append(pos + dv_seq)
 			if _in_bounds(pos + dv_atk):
 				result["hit"].append(pos + dv_atk)
+		CharacterData.SkillType.RDR_DASH:
+			var t: Vector2i = pos + 2 * dv_seq
+			result["move"].append(t)
+			result["hit"].append(t)
+		CharacterData.SkillType.RDR_DIAG:
+			var t: Vector2i = pos + dv_seq + dv_atk
+			result["move"].append(t)
+			result["hit"].append(t)
 	return result
 
 func set_skill_preview(slot: int) -> void:
@@ -410,7 +478,7 @@ func rotate_armed_skill(new_dir: int) -> void:
 	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
 		return
 	var data: Array = skill_slots[slot].duplicate()
-	var stype: int = CharacterData.classify_skill(data)
+	var stype: int = _classify(data)
 	if stype == CharacterData.SkillType.SAME_MA or stype == CharacterData.SkillType.SAME_AA:
 		data[0] = new_dir
 		data[1] = new_dir
@@ -426,6 +494,14 @@ func rotate_armed_skill(new_dir: int) -> void:
 			if CharacterData.DIR_VECTOR[d] == atk_dv:
 				data[1] = d
 				break
+	elif stype == CharacterData.SkillType.RDR_DASH:
+		data[0] = new_dir
+		data[1] = new_dir
+	elif stype == CharacterData.SkillType.RDR_DIAG:
+		var new_is_h: bool = (new_dir == CharacterData.Direction.LEFT or new_dir == CharacterData.Direction.RIGHT)
+		var d0_is_h: bool = (data[0] == CharacterData.Direction.LEFT or data[0] == CharacterData.Direction.RIGHT)
+		if d0_is_h == new_is_h: data[0] = new_dir
+		else: data[1] = new_dir
 	else:
 		# ORTHO_AA: axis-replacement (H key replaces H component, V key replaces V component)
 		var new_is_h: bool = (new_dir == CharacterData.Direction.LEFT
@@ -443,7 +519,7 @@ func use_skill(slot: int) -> void:
 	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
 		return
 	var slot_data: Array = skill_slots[slot]
-	var stype: int = CharacterData.classify_skill(slot_data)
+	var stype: int = _classify(slot_data)
 	var dv_seq: Vector2i = CharacterData.DIR_VECTOR[slot_data[0]]
 	var dv_atk: Vector2i = CharacterData.DIR_VECTOR[slot_data[1]]
 	var pos: Vector2i = player_pos
@@ -476,5 +552,13 @@ func use_skill(slot: int) -> void:
 		CharacterData.SkillType.ORTHO_AA:
 			_hit_cell(pos + dv_seq, slot_data[0])
 			_hit_cell(pos + dv_atk, slot_data[1])
+		CharacterData.SkillType.RDR_DASH:
+			var move_target: Vector2i = pos + 2 * dv_seq
+			if _in_bounds(move_target) and not CharacterData.is_enemy(grid[move_target.y][move_target.x]):
+				player_pos = move_target
+		CharacterData.SkillType.RDR_DIAG:
+			var jump_dest: Vector2i = pos + dv_seq + dv_atk
+			if _in_bounds(jump_dest) and not CharacterData.is_enemy(grid[jump_dest.y][jump_dest.x]):
+				player_pos = jump_dest
 	skill_slots[slot] = []
 	_refresh_visuals()

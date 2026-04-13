@@ -24,6 +24,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	if keycode == KEY_F2:
+		board.switch_character()
+		get_viewport().set_input_as_handled()
+		return
+
 	if keycode == KEY_F3:
 		board.debug_spawn_enemies(2)
 		get_viewport().set_input_as_handled()
