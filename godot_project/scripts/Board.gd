@@ -287,9 +287,16 @@ func try_combine_skill() -> bool:
 	return true
 
 func _try_combine_skill_unified() -> bool:
-	if skill_preview < 0 or skill_preview >= char_config.skill_slot_count:
+	var slot_index: int = skill_preview
+	if slot_index < 0 or slot_index >= char_config.skill_slot_count or skill_slots[slot_index].size() != 1:
+		slot_index = -1
+		for i: int in char_config.skill_slot_count:
+			if skill_slots[i].size() == 1:
+				slot_index = i
+				break
+	if slot_index < 0:
 		return false
-	var armed_slot: Array = skill_slots[skill_preview]
+	var armed_slot: Array = skill_slots[slot_index]
 	if armed_slot.size() != 1:
 		return false
 	if action_seq.is_empty():
@@ -298,7 +305,7 @@ func _try_combine_skill_unified() -> bool:
 	var dir_atk: int = armed_slot[0]
 	if CharacterData.DIR_VECTOR[dir_seq] + CharacterData.DIR_VECTOR[dir_atk] == Vector2i.ZERO:
 		return false
-	skill_slots[skill_preview] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
+	skill_slots[slot_index] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
 	_refresh_visuals()
 	return true
 
