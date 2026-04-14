@@ -321,40 +321,41 @@ func _try_combine_skill_mixed() -> bool:
 	_refresh_visuals()
 	return true
 
-func debug_spawn_enemies(count: int) -> void:
-	_rng.seed = turn
-	var available: Array[Vector2i] = []
+func _spawn_order(seed: int) -> Array[Vector2i]:
+	var all: Array[Vector2i] = []
 	for r: int in ROWS:
 		for c: int in COLS:
-			var pos: Vector2i = Vector2i(c, r)
-			if pos != player_pos and grid[r][c] == CharacterData.CellType.LIVE:
-				available.append(pos)
-	_rng_shuffle(available)
-	for i: int in mini(count, available.size()):
-		var epos: Vector2i = available[i]
-		grid[epos.y][epos.x] = CharacterData.CellType.ENEMY
+			all.append(Vector2i(c, r))
+	_rng.seed = seed
+	for i: int in range(all.size() - 1, 0, -1):
+		var j: int = _rng.randi_range(0, i)
+		var tmp: Vector2i = all[i]
+		all[i] = all[j]
+		all[j] = tmp
+	return all
+
+func debug_spawn_enemies(count: int) -> void:
+	var order: Array[Vector2i] = _spawn_order(turn)
+	var spawned: int = 0
+	for pos: Vector2i in order:
+		if spawned >= count:
+			break
+		if pos != player_pos and grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
+			grid[pos.y][pos.x] = CharacterData.CellType.ENEMY
+			spawned += 1
 	_compute_next_spawn_preview(count)
 	_refresh_visuals()
 
-func _rng_shuffle(arr: Array) -> void:
-	for i: int in range(arr.size() - 1, 0, -1):
-		var j: int = _rng.randi_range(0, i)
-		var tmp: Variant = arr[i]
-		arr[i] = arr[j]
-		arr[j] = tmp
-
 func _compute_next_spawn_preview(count: int) -> void:
-	_rng.seed = turn + 1
-	var available: Array[Vector2i] = []
-	for r: int in ROWS:
-		for c: int in COLS:
-			var pos: Vector2i = Vector2i(c, r)
-			if pos != player_pos and grid[r][c] == CharacterData.CellType.LIVE:
-				available.append(pos)
-	_rng_shuffle(available)
+	var order: Array[Vector2i] = _spawn_order(turn + 1)
 	_next_spawn_preview.clear()
-	for i: int in mini(count, available.size()):
-		_next_spawn_preview.append(available[i])
+	var found: int = 0
+	for pos: Vector2i in order:
+		if found >= count:
+			break
+		if pos != player_pos and grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
+			_next_spawn_preview.append(pos)
+			found += 1
 
 func _refresh_visuals() -> void:
 	for r: int in ROWS:
