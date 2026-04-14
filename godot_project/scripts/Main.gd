@@ -61,10 +61,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	if keycode == KEY_ENTER:
+	if keycode == KEY_CTRL:
 		if board.skill_preview >= 0 and board.skill_slots[board.skill_preview].size() == 1:
 			board.try_combine_skill()
-		else:
-			board.try_end_turn()
+		get_viewport().set_input_as_handled()
+		return
+
+	if keycode == KEY_ENTER:
+		board.try_end_turn()
 		get_viewport().set_input_as_handled()
 		return
