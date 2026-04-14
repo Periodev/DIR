@@ -329,12 +329,19 @@ func debug_spawn_enemies(count: int) -> void:
 			var pos: Vector2i = Vector2i(c, r)
 			if pos != player_pos and grid[r][c] == CharacterData.CellType.LIVE:
 				available.append(pos)
-	_rng.shuffle(available)
+	_rng_shuffle(available)
 	for i: int in mini(count, available.size()):
 		var epos: Vector2i = available[i]
 		grid[epos.y][epos.x] = CharacterData.CellType.ENEMY
 	_compute_next_spawn_preview(count)
 	_refresh_visuals()
+
+func _rng_shuffle(arr: Array) -> void:
+	for i: int in range(arr.size() - 1, 0, -1):
+		var j: int = _rng.randi_range(0, i)
+		var tmp: Variant = arr[i]
+		arr[i] = arr[j]
+		arr[j] = tmp
 
 func _compute_next_spawn_preview(count: int) -> void:
 	_rng.seed = turn + 1
@@ -344,7 +351,7 @@ func _compute_next_spawn_preview(count: int) -> void:
 			var pos: Vector2i = Vector2i(c, r)
 			if pos != player_pos and grid[r][c] == CharacterData.CellType.LIVE:
 				available.append(pos)
-	_rng.shuffle(available)
+	_rng_shuffle(available)
 	_next_spawn_preview.clear()
 	for i: int in mini(count, available.size()):
 		_next_spawn_preview.append(available[i])
