@@ -690,8 +690,7 @@ func use_skill(slot: int) -> void:
 			var jump_dest: Vector2i = pos + dv_seq + dv_atk
 			if _in_bounds(jump_dest) and not CharacterData.is_enemy(grid[jump_dest.y][jump_dest.x]):
 				player_pos = jump_dest
-	if stype == CharacterData.SkillType.RDR_DASH or stype == CharacterData.SkillType.RDR_DIAG:
-		if _has_adjacent_enemy(player_pos):
-			bonus_attacks += 1
+	if char_config.use_rdr_classifier:
+		bonus_attacks += 1
 	skill_slots[slot] = []
 	_refresh_visuals()
