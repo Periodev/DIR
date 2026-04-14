@@ -36,6 +36,9 @@ var skill_preview: int = -1  # -1 = none, 0/1 = slot index being held
 var kill_count: int = 0
 var shield_spawn_turn: Dictionary = {}  # Vector2i -> int (turn when spawned)
 
+var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var _next_spawn_preview: Array[Vector2i] = []
+
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 const _RDR_SCRIPT = preload("res://scripts/CharacterImpl_RDR.gd")
 
@@ -83,6 +86,13 @@ class ArrowOverlay extends Node2D:
 			var top_pt: Vector2 = shaft_end - perp * HEAD_ARM
 			var bot_pt: Vector2 = shaft_end + perp * HEAD_ARM
 			draw_polyline(PackedVector2Array([top_pt, tip, bot_pt]), COLOR, LINE_W, true)
+
+		# Next spawn preview
+		for p: Vector2i in board._next_spawn_preview:
+			draw_rect(Rect2(p.x * CELL_STEP_, p.y * CELL_STEP_, CELL_SIZE_, CELL_SIZE_),
+				Color(1.0, 0.25, 0.25, 0.18))
+			draw_rect(Rect2(p.x * CELL_STEP_, p.y * CELL_STEP_, CELL_SIZE_, CELL_SIZE_),
+				Color(1.0, 0.25, 0.25, 0.5), false, 1.5)
 
 		# Skill preview highlight
 		if board.skill_preview >= 0 and board.skill_preview < board.char_config.skill_slot_count:
@@ -150,6 +160,7 @@ func restart() -> void:
 	skill_preview = -1
 	kill_count = 0
 	shield_spawn_turn.clear()
+	_next_spawn_preview.clear()
 	_refresh_visuals()
 
 func try_move(dir: int) -> bool:
@@ -311,17 +322,32 @@ func _try_combine_skill_mixed() -> bool:
 	return true
 
 func debug_spawn_enemies(count: int) -> void:
+	_rng.seed = turn
 	var available: Array[Vector2i] = []
 	for r: int in ROWS:
 		for c: int in COLS:
 			var pos: Vector2i = Vector2i(c, r)
 			if pos != player_pos and grid[r][c] == CharacterData.CellType.LIVE:
 				available.append(pos)
-	available.shuffle()
+	_rng.shuffle(available)
 	for i: int in mini(count, available.size()):
 		var epos: Vector2i = available[i]
 		grid[epos.y][epos.x] = CharacterData.CellType.ENEMY
+	_compute_next_spawn_preview(count)
 	_refresh_visuals()
+
+func _compute_next_spawn_preview(count: int) -> void:
+	_rng.seed = turn + 1
+	var available: Array[Vector2i] = []
+	for r: int in ROWS:
+		for c: int in COLS:
+			var pos: Vector2i = Vector2i(c, r)
+			if pos != player_pos and grid[r][c] == CharacterData.CellType.LIVE:
+				available.append(pos)
+	_rng.shuffle(available)
+	_next_spawn_preview.clear()
+	for i: int in mini(count, available.size()):
+		_next_spawn_preview.append(available[i])
 
 func _refresh_visuals() -> void:
 	for r: int in ROWS:
