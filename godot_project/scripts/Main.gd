@@ -18,6 +18,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		board.set_skill_preview(1 if board.skill_preview != 1 else -1)
 		get_viewport().set_input_as_handled()
 		return
+	if keycode == KEY_C:
+		board.set_skill_preview(2 if board.skill_preview != 2 else -1)
+		get_viewport().set_input_as_handled()
+		return
+	if keycode == KEY_V:
+		board.set_skill_preview(3 if board.skill_preview != 3 else -1)
+		get_viewport().set_input_as_handled()
+		return
 
 	if keycode == KEY_R:
 		board.restart()
@@ -34,15 +42,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	if keycode == KEY_1:
-		board.set_atk_highlight(0)
-		get_viewport().set_input_as_handled()
-		return
-	if keycode == KEY_2:
-		board.set_atk_highlight(1)
-		get_viewport().set_input_as_handled()
-		return
-
 	var dir: int = CharacterData.key_to_direction(keycode)
 	if dir != CharacterData.Direction.NONE:
 		if board.skill_preview >= 0:
@@ -55,8 +54,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if keycode == KEY_SPACE:
 		if board.skill_preview >= 0:
-			board.use_skill(board.skill_preview)
-			board.set_skill_preview(-1)
+			var slot_data: Array = board.skill_slots[board.skill_preview]
+			if slot_data.size() == 3:
+				board.use_skill(board.skill_preview)
+				board.set_skill_preview(-1)
+			elif slot_data.size() == 1:
+				board.try_combine_skill()
 		else:
 			board.try_combine_skill()
 		get_viewport().set_input_as_handled()

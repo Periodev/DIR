@@ -12,7 +12,6 @@ const SEQ_STEP: float = SEQ_SIZE + SEQ_GAP
 const SEQ_MARGIN_TOP: float = 20.0
 const ATK_QUEUE_GAP: float = 12.0
 const SKILL_MARGIN_TOP: float = 20.0
-const SKILL_SLOTS: int = 2
 
 signal board_updated
 
@@ -32,7 +31,7 @@ var turn: int = 1
 var attack_queue: Array[int] = []
 var attack_queue_highlighted: int = -1
 
-var skill_slots: Array = [[], []]
+var skill_slots: Array = []
 var skill_preview: int = -1  # -1 = none, 0/1 = slot index being held
 var kill_count: int = 0
 var shield_spawn_turn: Dictionary = {}  # Vector2i -> int (turn when spawned)
@@ -86,7 +85,7 @@ class ArrowOverlay extends Node2D:
 			draw_polyline(PackedVector2Array([top_pt, tip, bot_pt]), COLOR, LINE_W, true)
 
 		# Skill preview highlight
-		if board.skill_preview >= 0 and board.skill_preview < board.SKILL_SLOTS:
+		if board.skill_preview >= 0 and board.skill_preview < board.char_config.skill_slot_count:
 			if not board.skill_slots[board.skill_preview].is_empty():
 				var preview: Dictionary = board.get_skill_preview_cells(board.skill_preview)
 				for p in preview.get("move", []):
@@ -145,7 +144,9 @@ func restart() -> void:
 	turn = 1
 	attack_queue.clear()
 	attack_queue_highlighted = -1
-	skill_slots = [[], []]
+	skill_slots.resize(char_config.skill_slot_count)
+	for i: int in char_config.skill_slot_count:
+		skill_slots[i] = []
 	skill_preview = -1
 	kill_count = 0
 	shield_spawn_turn.clear()
@@ -200,11 +201,37 @@ func try_attack(dir: int) -> bool:
 	return true
 
 func try_end_turn() -> bool:
-	for i: int in action_seq.size():
-		if action_seq_is_attack[i]:
-			attack_queue.append(action_seq[i])
-	while attack_queue.size() > char_config.attack_queue_cap:
-		attack_queue.pop_front()
+	if char_config.use_unified_slots:
+		var new_attacks: Array[int] = []
+		for i: int in action_seq.size():
+			if action_seq_is_attack[i]:
+				new_attacks.append(action_seq[i])
+		var empty_indices: Array[int] = []
+		var vector_indices: Array[int] = []
+		for i: int in char_config.skill_slot_count:
+			if skill_slots[i].size() == 0:
+				empty_indices.append(i)
+			elif skill_slots[i].size() == 1:
+				vector_indices.append(i)
+		while new_attacks.size() > empty_indices.size() + vector_indices.size():
+			new_attacks.pop_front()
+		var fill_idx: int = 0
+		for i: int in empty_indices:
+			if fill_idx >= new_attacks.size():
+				break
+			skill_slots[i] = [new_attacks[fill_idx]]
+			fill_idx += 1
+		for i: int in vector_indices:
+			if fill_idx >= new_attacks.size():
+				break
+			skill_slots[i] = [new_attacks[fill_idx]]
+			fill_idx += 1
+	else:
+		for i: int in action_seq.size():
+			if action_seq_is_attack[i]:
+				attack_queue.append(action_seq[i])
+		while attack_queue.size() > char_config.attack_queue_cap:
+			attack_queue.pop_front()
 	turn += 1
 	action_seq.clear()
 	action_seq_is_attack.clear()
@@ -221,6 +248,8 @@ func set_atk_highlight(slot: int) -> void:
 	queue_redraw()
 
 func try_combine_skill() -> bool:
+	if char_config.use_unified_slots:
+		return _try_combine_skill_unified()
 	if char_config.skill_mixed:
 		return _try_combine_skill_mixed()
 	if attack_queue_highlighted < 0 or attack_queue_highlighted >= attack_queue.size():
@@ -234,7 +263,7 @@ func try_combine_skill() -> bool:
 		return false
 	# Find first empty skill slot
 	var empty: int = -1
-	for i: int in SKILL_SLOTS:
+	for i: int in char_config.skill_slot_count:
 		if skill_slots[i].is_empty():
 			empty = i
 			break
@@ -243,6 +272,22 @@ func try_combine_skill() -> bool:
 	skill_slots[empty] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
 	attack_queue.remove_at(attack_queue_highlighted)
 	attack_queue_highlighted = -1
+	_refresh_visuals()
+	return true
+
+func _try_combine_skill_unified() -> bool:
+	if skill_preview < 0 or skill_preview >= char_config.skill_slot_count:
+		return false
+	var armed_slot: Array = skill_slots[skill_preview]
+	if armed_slot.size() != 1:
+		return false
+	if action_seq.is_empty():
+		return false
+	var dir_seq: int = action_seq[-1]
+	var dir_atk: int = armed_slot[0]
+	if CharacterData.DIR_VECTOR[dir_seq] + CharacterData.DIR_VECTOR[dir_atk] == Vector2i.ZERO:
+		return false
+	skill_slots[skill_preview] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
 	_refresh_visuals()
 	return true
 
@@ -255,7 +300,7 @@ func _try_combine_skill_mixed() -> bool:
 	if CharacterData.DIR_VECTOR[dir1] + CharacterData.DIR_VECTOR[dir2] == Vector2i.ZERO:
 		return false
 	var empty: int = -1
-	for i: int in SKILL_SLOTS:
+	for i: int in char_config.skill_slot_count:
 		if skill_slots[i].is_empty():
 			empty = i
 			break
@@ -321,54 +366,94 @@ func _draw() -> void:
 			draw_string(font, Vector2(x, text_y), arrow,
 				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
 
-	# Skill slots (bottom-left)
-	var skill_y: float
-	if char_config.skill_mixed:
-		skill_y = seq_y + SEQ_SIZE + SKILL_MARGIN_TOP
-	else:
-		# Attack queue row
-		var atk_slots: int = char_config.attack_queue_cap
-		var total_atk_w: float = (atk_slots - 1) * SEQ_STEP + SEQ_SIZE
-		var atk_x0: float = (board_w - total_atk_w) / 2.0
-		var atk_y: float = seq_y + SEQ_SIZE + ATK_QUEUE_GAP
-
-		for i: int in atk_slots:
-			var ax: float = atk_x0 + i * SEQ_STEP
-			var arect: Rect2 = Rect2(ax, atk_y, SEQ_SIZE, SEQ_SIZE)
-			var is_hl: bool = i == attack_queue_highlighted
-			draw_rect(arect, Color(0.16, 0.09, 0.04) if is_hl else Color(0.10, 0.10, 0.13))
-			draw_rect(arect, Color(1.0, 0.6, 0.15) if is_hl else Color(0.40, 0.25, 0.08), false,
-				2.5 if is_hl else 1.5)
-			if i < attack_queue.size():
-				var atk_arrow: String = CharacterData.DIR_ARROWS[attack_queue[i]]
-				var atk_text_y: float = atk_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-				draw_string(font, Vector2(ax, atk_text_y), atk_arrow,
-					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
-
-		skill_y = atk_y + SEQ_SIZE + SKILL_MARGIN_TOP
 	var skill_font_size: int = 26
-	for i: int in SKILL_SLOTS:
-		var sx: float = i * SEQ_STEP
-		var srect: Rect2 = Rect2(sx, skill_y, SEQ_SIZE, SEQ_SIZE)
-		var is_previewing: bool = skill_preview == i
-		draw_rect(srect, Color(0.08, 0.08, 0.18))
-		draw_rect(srect, Color(0.65, 0.65, 1.0) if is_previewing else Color(0.35, 0.35, 0.65),
-			false, 2.5 if is_previewing else 1.5)
-		if not skill_slots[i].is_empty():
-			var stext_y: float = skill_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0 - 8.0
-			var half: float = SEQ_SIZE / 2.0
-			var col_a: Color = Color(1.0, 0.6, 0.15) if (skill_slots[i].size() > 2 and skill_slots[i][2]) else Color.WHITE
-			var col_b: Color = Color(1.0, 0.6, 0.15)
-			draw_string(font, Vector2(sx, stext_y),
-				CharacterData.DIR_ARROWS[skill_slots[i][0]],
-				HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_a)
-			draw_string(font, Vector2(sx + half, stext_y),
-				CharacterData.DIR_ARROWS[skill_slots[i][1]],
-				HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_b)
-			var stype: int = _classify(skill_slots[i])
-			var type_name: String = CharacterData.SKILL_TYPE_NAMES[stype]
-			draw_string(font, Vector2(sx, skill_y + SEQ_SIZE - 2.0), type_name,
-				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
+	if char_config.use_unified_slots:
+		# Unified slots: single row replacing both attack queue and skill slots
+		var slot_count: int = char_config.skill_slot_count
+		var total_slot_w: float = (slot_count - 1) * SEQ_STEP + SEQ_SIZE
+		var slot_x0: float = (board_w - total_slot_w) / 2.0
+		var slot_y: float = seq_y + SEQ_SIZE + ATK_QUEUE_GAP
+		for i: int in slot_count:
+			var sx: float = slot_x0 + i * SEQ_STEP
+			var srect: Rect2 = Rect2(sx, slot_y, SEQ_SIZE, SEQ_SIZE)
+			var is_armed: bool = skill_preview == i
+			var slot_data: Array = skill_slots[i]
+			if slot_data.size() == 3:
+				draw_rect(srect, Color(0.08, 0.08, 0.18))
+				draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.35, 0.35, 0.65),
+					false, 2.5 if is_armed else 1.5)
+				var stext_y: float = slot_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0 - 8.0
+				var half: float = SEQ_SIZE / 2.0
+				var col_a: Color = Color(1.0, 0.6, 0.15) if slot_data[2] else Color.WHITE
+				draw_string(font, Vector2(sx, stext_y),
+					CharacterData.DIR_ARROWS[slot_data[0]],
+					HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_a)
+				draw_string(font, Vector2(sx + half, stext_y),
+					CharacterData.DIR_ARROWS[slot_data[1]],
+					HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, Color(1.0, 0.6, 0.15))
+				var stype: int = _classify(slot_data)
+				draw_string(font, Vector2(sx, slot_y + SEQ_SIZE - 2.0),
+					CharacterData.SKILL_TYPE_NAMES[stype],
+					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
+			elif slot_data.size() == 1:
+				draw_rect(srect, Color(0.16, 0.09, 0.04) if is_armed else Color(0.10, 0.10, 0.13))
+				draw_rect(srect, Color(1.0, 0.6, 0.15) if is_armed else Color(0.40, 0.25, 0.08),
+					false, 2.5 if is_armed else 1.5)
+				var atk_text_y: float = slot_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+				draw_string(font, Vector2(sx, atk_text_y), CharacterData.DIR_ARROWS[slot_data[0]],
+					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
+			else:
+				draw_rect(srect, Color(0.10, 0.10, 0.13))
+				draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.30, 0.30, 0.35),
+					false, 2.5 if is_armed else 1.5)
+	else:
+		# Skill slots (legacy)
+		var skill_y: float
+		if char_config.skill_mixed:
+			skill_y = seq_y + SEQ_SIZE + SKILL_MARGIN_TOP
+		else:
+			# Attack queue row
+			var atk_slots: int = char_config.attack_queue_cap
+			var total_atk_w: float = (atk_slots - 1) * SEQ_STEP + SEQ_SIZE
+			var atk_x0: float = (board_w - total_atk_w) / 2.0
+			var atk_y: float = seq_y + SEQ_SIZE + ATK_QUEUE_GAP
+
+			for i: int in atk_slots:
+				var ax: float = atk_x0 + i * SEQ_STEP
+				var arect: Rect2 = Rect2(ax, atk_y, SEQ_SIZE, SEQ_SIZE)
+				var is_hl: bool = i == attack_queue_highlighted
+				draw_rect(arect, Color(0.16, 0.09, 0.04) if is_hl else Color(0.10, 0.10, 0.13))
+				draw_rect(arect, Color(1.0, 0.6, 0.15) if is_hl else Color(0.40, 0.25, 0.08), false,
+					2.5 if is_hl else 1.5)
+				if i < attack_queue.size():
+					var atk_arrow: String = CharacterData.DIR_ARROWS[attack_queue[i]]
+					var atk_text_y: float = atk_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+					draw_string(font, Vector2(ax, atk_text_y), atk_arrow,
+						HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
+
+			skill_y = atk_y + SEQ_SIZE + SKILL_MARGIN_TOP
+		for i: int in char_config.skill_slot_count:
+			var sx: float = i * SEQ_STEP
+			var srect: Rect2 = Rect2(sx, skill_y, SEQ_SIZE, SEQ_SIZE)
+			var is_previewing: bool = skill_preview == i
+			draw_rect(srect, Color(0.08, 0.08, 0.18))
+			draw_rect(srect, Color(0.65, 0.65, 1.0) if is_previewing else Color(0.35, 0.35, 0.65),
+				false, 2.5 if is_previewing else 1.5)
+			if not skill_slots[i].is_empty():
+				var stext_y: float = skill_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0 - 8.0
+				var half: float = SEQ_SIZE / 2.0
+				var col_a: Color = Color(1.0, 0.6, 0.15) if (skill_slots[i].size() > 2 and skill_slots[i][2]) else Color.WHITE
+				var col_b: Color = Color(1.0, 0.6, 0.15)
+				draw_string(font, Vector2(sx, stext_y),
+					CharacterData.DIR_ARROWS[skill_slots[i][0]],
+					HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_a)
+				draw_string(font, Vector2(sx + half, stext_y),
+					CharacterData.DIR_ARROWS[skill_slots[i][1]],
+					HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_b)
+				var stype: int = _classify(skill_slots[i])
+				var type_name: String = CharacterData.SKILL_TYPE_NAMES[stype]
+				draw_string(font, Vector2(sx, skill_y + SEQ_SIZE - 2.0), type_name,
+					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
 
 	# Turn counter + kill count (right of board)
 	var side_x: float = board_w + 28.0
@@ -383,7 +468,11 @@ func _draw() -> void:
 
 func _update_board_offset() -> void:
 	var board_w: float = (COLS - 1) * CELL_STEP + CELL_SIZE
-	var total_h: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE + SKILL_MARGIN_TOP + SEQ_SIZE
+	var total_h: float
+	if char_config != null and char_config.use_unified_slots:
+		total_h = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE
+	else:
+		total_h = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE + SKILL_MARGIN_TOP + SEQ_SIZE
 	var vp: Vector2 = get_viewport_rect().size
 	position = Vector2((vp.x - board_w) / 2.0, (vp.y - total_h) / 2.0)
 
@@ -440,7 +529,7 @@ func _hit_cell(p: Vector2i, attack_dir: int) -> void:
 
 func get_skill_preview_cells(slot: int) -> Dictionary:
 	var result: Dictionary = {"move": [], "hit": []}
-	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
+	if slot < 0 or slot >= char_config.skill_slot_count or skill_slots[slot].size() != 3:
 		return result
 	var slot_data: Array = skill_slots[slot]
 	var stype: int = _classify(slot_data)
@@ -482,7 +571,7 @@ func set_skill_preview(slot: int) -> void:
 
 func rotate_armed_skill(new_dir: int) -> void:
 	var slot: int = skill_preview
-	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
+	if slot < 0 or slot >= char_config.skill_slot_count or skill_slots[slot].size() != 3:
 		return
 	var data: Array = skill_slots[slot].duplicate()
 	var stype: int = _classify(data)
@@ -523,7 +612,7 @@ func rotate_armed_skill(new_dir: int) -> void:
 	_refresh_visuals()
 
 func use_skill(slot: int) -> void:
-	if slot < 0 or slot >= SKILL_SLOTS or skill_slots[slot].is_empty():
+	if slot < 0 or slot >= char_config.skill_slot_count or skill_slots[slot].size() != 3:
 		return
 	var slot_data: Array = skill_slots[slot]
 	var stype: int = _classify(slot_data)

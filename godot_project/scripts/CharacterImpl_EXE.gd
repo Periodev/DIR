@@ -6,4 +6,6 @@ static func get_config() -> CharacterData.Config:
 	c.seq_slots  = 4
 	c.max_moves  = 2
 	c.max_attacks = 2
+	c.skill_slot_count = 4
+	c.use_unified_slots = true
 	return c

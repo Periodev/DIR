@@ -59,6 +59,8 @@ class Config:
 	var skill_mixed: bool = false
 	var use_rdr_classifier: bool = false
 	var attack_queue_cap: int = 3
+	var skill_slot_count: int = 2
+	var use_unified_slots: bool = false
 
 const DIR_VECTOR: Dictionary = {
 	Direction.UP:    Vector2i(0, -1),
