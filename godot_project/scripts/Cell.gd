@@ -4,6 +4,7 @@ const CELL_SIZE: float = 100.0
 
 var cell_type: int = CharacterData.CellType.LIVE
 var is_player: bool = false
+var is_polluted: bool = false
 var grid_pos: Vector2i = Vector2i.ZERO
 
 func set_type(t: int) -> void:
@@ -14,9 +15,16 @@ func set_player(v: bool) -> void:
 	is_player = v
 	queue_redraw()
 
+func set_polluted(v: bool) -> void:
+	is_polluted = v
+	queue_redraw()
+
 func _draw() -> void:
 	var rect: Rect2 = Rect2(0.0, 0.0, CELL_SIZE, CELL_SIZE)
 	draw_rect(rect, Color(0.10, 0.10, 0.13))
+	if is_polluted:
+		draw_rect(rect.grow(-4.0), Color(0.20, 0.48, 0.20, 0.75))
+		draw_rect(rect.grow(-10.0), Color(0.10, 0.22, 0.10, 0.55))
 	draw_rect(rect, Color(0.25, 0.25, 0.30), false, 1.0)
 
 	var center: Vector2 = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)

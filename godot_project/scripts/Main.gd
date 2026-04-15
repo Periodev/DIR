@@ -42,6 +42,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	if not board.can_accept_input():
+		return
+
 	var dir: int = CharacterData.key_to_direction(keycode)
 	if dir != CharacterData.Direction.NONE:
 		if board.skill_preview >= 0:
