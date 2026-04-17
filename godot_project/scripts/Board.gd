@@ -248,7 +248,7 @@ func try_attack(dir: int) -> bool:
 func try_end_turn() -> bool:
 	if game_over:
 		return false
-	if char_config.use_unified_slots:
+	if char_config.use_unified_slots and not char_config.use_rdr_classifier:
 		var new_attacks: Array[int] = []
 		for i: int in action_seq.size():
 			if action_seq_is_attack[i]:
@@ -329,6 +329,8 @@ func try_combine_skill() -> bool:
 	return true
 
 func _try_combine_skill_unified() -> bool:
+	if char_config.use_rdr_classifier:
+		return _try_store_rdr_skill_vector()
 	var slot_index: int = skill_preview
 	if slot_index < 0 or slot_index >= char_config.skill_slot_count or skill_slots[slot_index].size() != 1:
 		slot_index = -1
@@ -345,6 +347,42 @@ func _try_combine_skill_unified() -> bool:
 	if CharacterData.DIR_VECTOR[dir_seq] + CharacterData.DIR_VECTOR[dir_atk] == Vector2i.ZERO:
 		return false
 	skill_slots[slot_index] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
+	_refresh_visuals()
+	return true
+
+func _try_store_rdr_skill_vector() -> bool:
+	if action_seq.is_empty():
+		return false
+	var slot_index: int = skill_preview
+	var slot_data: Array = []
+	if slot_index >= 0 and slot_index < char_config.skill_slot_count:
+		slot_data = skill_slots[slot_index]
+	if slot_index < 0 or slot_index >= char_config.skill_slot_count or slot_data.size() >= 3:
+		slot_index = -1
+		for i: int in char_config.skill_slot_count:
+			if skill_slots[i].is_empty():
+				slot_index = i
+				break
+		if slot_index < 0:
+			for i: int in char_config.skill_slot_count:
+				if skill_slots[i].size() == 1:
+					slot_index = i
+					break
+	if slot_index < 0:
+		return false
+	slot_data = skill_slots[slot_index]
+	if slot_data.size() >= 3:
+		return false
+	var dir_seq: int = action_seq[-1]
+	if slot_data.is_empty():
+		skill_slots[slot_index] = [dir_seq]
+	elif slot_data.size() == 1:
+		var dir_prev: int = slot_data[0]
+		if CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] == Vector2i.ZERO:
+			return false
+		skill_slots[slot_index] = [dir_prev, dir_seq, false]
+	else:
+		return false
 	_refresh_visuals()
 	return true
 
@@ -877,6 +915,11 @@ func _has_combinable_material() -> bool:
 	if action_seq.is_empty():
 		return false
 	if char_config.use_unified_slots:
+		if char_config.use_rdr_classifier:
+			for slot_data: Array in skill_slots:
+				if slot_data.size() < 3:
+					return true
+			return false
 		for slot_data: Array in skill_slots:
 			if slot_data.size() == 1:
 				return true
