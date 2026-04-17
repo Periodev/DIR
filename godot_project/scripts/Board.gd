@@ -97,15 +97,17 @@ class ArrowOverlay extends Node2D:
 
 		for entry: Dictionary in board._next_spawn_preview:
 			var p: Vector2i = entry.get("pos", Vector2i.ZERO)
-			draw_rect(
-				Rect2(p.x * cell_step_, p.y * cell_step_, cell_size_, cell_size_),
-				Color(1.0, 0.25, 0.25, 0.18)
-			)
-			draw_rect(
-				Rect2(p.x * cell_step_, p.y * cell_step_, cell_size_, cell_size_),
-				Color(1.0, 0.25, 0.25, 0.5),
-				false,
-				1.5
+			var warn_font: Font = ThemeDB.fallback_font
+			var warn_size: int = 42
+			var warn_y: float = p.y * cell_step_ + (cell_size_ + warn_size * 0.7) / 2.0
+			draw_string(
+				warn_font,
+				Vector2(p.x * cell_step_, warn_y),
+				"!",
+				HORIZONTAL_ALIGNMENT_CENTER,
+				cell_size_,
+				warn_size,
+				Color(1.0, 0.35, 0.35, 0.95)
 			)
 
 		if board.skill_preview >= 0 and board.skill_preview < board.char_config.skill_slot_count:
@@ -486,7 +488,7 @@ func _is_enemy_pollution_warning(pos: Vector2i) -> bool:
 		return false
 	if not _in_bounds(pos) or not CharacterData.is_enemy(grid[pos.y][pos.x]):
 		return false
-	return turn - int(enemy_spawn_turn[pos]) == 1
+	return turn - int(enemy_spawn_turn[pos]) == 0
 
 func _enemy_pollution_direction(pos: Vector2i) -> int:
 	if not enemy_pollution_dir.has(pos):
@@ -704,7 +706,7 @@ func _spread_pollution() -> void:
 	for pos: Vector2i in enemy_spawn_turn.keys():
 		if not _in_bounds(pos):
 			continue
-		if CharacterData.is_enemy(grid[pos.y][pos.x]) and turn - int(enemy_spawn_turn[pos]) >= 2:
+		if CharacterData.is_enemy(grid[pos.y][pos.x]) and turn - int(enemy_spawn_turn[pos]) >= 1:
 			polluted_grid[pos.y][pos.x] = true
 			if enemy_pollution_dir.has(pos):
 				var dir_id: int = int(enemy_pollution_dir[pos])
