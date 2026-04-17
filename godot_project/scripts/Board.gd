@@ -15,6 +15,8 @@ const SKILL_MARGIN_TOP: float = 20.0
 
 signal board_updated
 
+enum SpawnMode { SEEDED, TRUE_RANDOM }
+
 var char_config: CharacterData.Config = null
 var _char_index: int = 0
 
@@ -23,6 +25,7 @@ var polluted_grid: Array[Array] = []
 var player_pos: Vector2i = Vector2i(COLS / 2, ROWS / 2)
 var action_seq: Array[int] = []
 var action_seq_is_attack: Array[bool] = []
+var action_seq_used_for_space: Array[bool] = []
 var moves_this_turn: int = 0
 var attacks_this_turn: int = 0
 var bonus_moves: int = 0
@@ -42,6 +45,7 @@ var game_over_reason: String = ""
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _next_spawn_preview: Array[Vector2i] = []
+var _spawn_mode: int = SpawnMode.SEEDED
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 const _RDR_SCRIPT = preload("res://scripts/CharacterImpl_RDR.gd")
@@ -125,6 +129,11 @@ func switch_character() -> void:
 	_char_index = (_char_index + 1) % 2
 	restart()
 
+func toggle_spawn_mode() -> void:
+	_spawn_mode = SpawnMode.TRUE_RANDOM if _spawn_mode == SpawnMode.SEEDED else SpawnMode.SEEDED
+	_compute_next_spawn_preview(3)
+	_refresh_visuals()
+
 func _ready() -> void:
 	_load_char_config()
 	_cell_scene = load("res://scenes/Cell.tscn")
@@ -149,6 +158,7 @@ func _ready() -> void:
 
 func restart() -> void:
 	_load_char_config()
+	_rng.randomize()
 	grid.clear()
 	polluted_grid.clear()
 	for _r: int in ROWS:
@@ -162,6 +172,7 @@ func restart() -> void:
 	player_pos = Vector2i(COLS / 2, ROWS / 2)
 	action_seq.clear()
 	action_seq_is_attack.clear()
+	action_seq_used_for_space.clear()
 	moves_this_turn = 0
 	attacks_this_turn = 0
 	bonus_moves = 0
@@ -209,6 +220,7 @@ func try_move(dir: int) -> bool:
 	player_pos += CharacterData.DIR_VECTOR[dir]
 	action_seq.append(dir)
 	action_seq_is_attack.append(false)
+	action_seq_used_for_space.append(false)
 	moves_this_turn += 1
 	_refresh_visuals()
 	return true
@@ -241,6 +253,7 @@ func try_attack(dir: int) -> bool:
 	if not char_config.use_rdr_classifier or killed:
 		action_seq.append(dir)
 		action_seq_is_attack.append(true)
+		action_seq_used_for_space.append(false)
 	attacks_this_turn += 1
 	_refresh_visuals()
 	return true
@@ -283,6 +296,7 @@ func try_end_turn() -> bool:
 	turn += 1
 	action_seq.clear()
 	action_seq_is_attack.clear()
+	action_seq_used_for_space.clear()
 	moves_this_turn = 0
 	attacks_this_turn = 0
 	bonus_moves = 0
@@ -353,6 +367,9 @@ func _try_combine_skill_unified() -> bool:
 func _try_store_rdr_skill_vector() -> bool:
 	if action_seq.is_empty():
 		return false
+	var used_index: int = action_seq.size() - 1
+	if used_index < 0 or used_index >= action_seq_used_for_space.size() or action_seq_used_for_space[used_index]:
+		return false
 	var slot_index: int = skill_preview
 	var slot_data: Array = []
 	if slot_index >= 0 and slot_index < char_config.skill_slot_count:
@@ -383,6 +400,7 @@ func _try_store_rdr_skill_vector() -> bool:
 		skill_slots[slot_index] = [dir_prev, dir_seq, false]
 	else:
 		return false
+	action_seq_used_for_space[used_index] = true
 	_refresh_visuals()
 	return true
 
@@ -409,7 +427,8 @@ func _spawn_order(seed: int) -> Array[Vector2i]:
 	for r: int in ROWS:
 		for c: int in COLS:
 			all.append(Vector2i(c, r))
-	_rng.seed = seed
+	if _spawn_mode == SpawnMode.SEEDED:
+		_rng.seed = seed
 	for i: int in range(all.size() - 1, 0, -1):
 		var j: int = _rng.randi_range(0, i)
 		var tmp: Vector2i = all[i]
@@ -417,29 +436,28 @@ func _spawn_order(seed: int) -> Array[Vector2i]:
 		all[j] = tmp
 	return all
 
-func debug_spawn_enemies(count: int) -> void:
-	var order: Array[Vector2i] = _spawn_order(turn)
-	var spawned: int = 0
+func _build_spawn_preview(count: int, seed: int) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	var order: Array[Vector2i] = _spawn_order(seed)
 	for pos: Vector2i in order:
-		if spawned >= count:
+		if result.size() >= count:
 			break
+		if pos != player_pos and grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
+			result.append(pos)
+	return result
+
+func debug_spawn_enemies(count: int) -> void:
+	if _next_spawn_preview.is_empty():
+		_next_spawn_preview = _build_spawn_preview(count, turn)
+	for pos: Vector2i in _next_spawn_preview:
 		if pos != player_pos and grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
 			grid[pos.y][pos.x] = CharacterData.CellType.ENEMY
 			enemy_spawn_turn[pos] = turn
-			spawned += 1
 	_compute_next_spawn_preview(count)
 	_refresh_visuals()
 
 func _compute_next_spawn_preview(count: int) -> void:
-	var order: Array[Vector2i] = _spawn_order(turn + 1)
-	_next_spawn_preview.clear()
-	var found: int = 0
-	for pos: Vector2i in order:
-		if found >= count:
-			break
-		if pos != player_pos and grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
-			_next_spawn_preview.append(pos)
-			found += 1
+	_next_spawn_preview = _build_spawn_preview(count, turn + 1)
 
 func _refresh_visuals() -> void:
 	for r: int in ROWS:
@@ -476,11 +494,12 @@ func _draw() -> void:
 		var x: float = seq_x0 + i * SEQ_STEP
 		var rect: Rect2 = Rect2(x, seq_y, SEQ_SIZE, SEQ_SIZE)
 		draw_rect(rect, Color(0.10, 0.10, 0.13))
-		draw_rect(rect, Color(0.30, 0.30, 0.35), false, 1.5)
+		var seq_locked: bool = i < action_seq_used_for_space.size() and action_seq_used_for_space[i]
+		draw_rect(rect, Color(0.18, 0.75, 0.75) if seq_locked else Color(0.30, 0.30, 0.35), false, 1.5)
 		if i < action_seq.size():
 			var arrow: String = CharacterData.DIR_ARROWS[action_seq[i]]
 			var text_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-			var col: Color = Color(1.0, 0.6, 0.15) if action_seq_is_attack[i] else Color.WHITE
+			var col: Color = Color(0.70, 0.85, 0.85) if seq_locked else (Color(1.0, 0.6, 0.15) if action_seq_is_attack[i] else Color.WHITE)
 			draw_string(font, Vector2(x, text_y), arrow,
 				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
 
@@ -569,13 +588,17 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
 	draw_string(font, Vector2(side_x, 66.0), str(turn),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color.WHITE)
-	draw_string(font, Vector2(side_x, 100.0), "KILL",
+	draw_string(font, Vector2(side_x, 94.0), "SPAWN",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 140.0), str(kill_count),
+	draw_string(font, Vector2(side_x, 118.0), "SEEDED" if _spawn_mode == SpawnMode.SEEDED else "RANDOM",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 0.95))
+	draw_string(font, Vector2(side_x, 152.0), "KILL",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+	draw_string(font, Vector2(side_x, 192.0), str(kill_count),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color(1.0, 0.4, 0.4))
-	draw_string(font, Vector2(side_x, 174.0), "THREAT",
+	draw_string(font, Vector2(side_x, 226.0), "THREAT",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 214.0), str(threat["score"]),
+	draw_string(font, Vector2(side_x, 266.0), str(threat["score"]),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.45, 0.9, 0.45))
 	if game_over:
 		draw_rect(Rect2(-14.0, -14.0, board_w + 160.0, ROWS * CELL_STEP + 30.0), Color(0, 0, 0, 0.35))
