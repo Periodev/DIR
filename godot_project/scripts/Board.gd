@@ -40,11 +40,12 @@ var skill_preview: int = -1
 var kill_count: int = 0
 var shield_spawn_turn: Dictionary = {}
 var enemy_spawn_turn: Dictionary = {}
+var enemy_pollution_dir: Dictionary = {}
 var game_over: bool = false
 var game_over_reason: String = ""
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
-var _next_spawn_preview: Array[Vector2i] = []
+var _next_spawn_preview: Array = []
 var _spawn_mode: int = SpawnMode.SEEDED
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
@@ -94,7 +95,8 @@ class ArrowOverlay extends Node2D:
 			var bot_pt: Vector2 = shaft_end + perp * head_arm
 			draw_polyline(PackedVector2Array([top_pt, tip, bot_pt]), color, line_w, true)
 
-		for p: Vector2i in board._next_spawn_preview:
+		for entry: Dictionary in board._next_spawn_preview:
+			var p: Vector2i = entry.get("pos", Vector2i.ZERO)
 			draw_rect(
 				Rect2(p.x * cell_step_, p.y * cell_step_, cell_size_, cell_size_),
 				Color(1.0, 0.25, 0.25, 0.18)
@@ -187,6 +189,7 @@ func restart() -> void:
 	kill_count = 0
 	shield_spawn_turn.clear()
 	enemy_spawn_turn.clear()
+	enemy_pollution_dir.clear()
 	game_over = false
 	game_over_reason = ""
 	_next_spawn_preview.clear()
@@ -436,23 +439,27 @@ func _spawn_order(seed: int) -> Array[Vector2i]:
 		all[j] = tmp
 	return all
 
-func _build_spawn_preview(count: int, seed: int) -> Array[Vector2i]:
-	var result: Array[Vector2i] = []
+func _build_spawn_preview(count: int, seed: int) -> Array:
+	var result: Array = []
 	var order: Array[Vector2i] = _spawn_order(seed)
 	for pos: Vector2i in order:
 		if result.size() >= count:
 			break
 		if pos != player_pos and grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
-			result.append(pos)
+			result.append({
+				"pos": pos,
+			})
 	return result
 
 func debug_spawn_enemies(count: int) -> void:
 	if _next_spawn_preview.is_empty():
 		_next_spawn_preview = _build_spawn_preview(count, turn)
-	for pos: Vector2i in _next_spawn_preview:
+	for entry: Dictionary in _next_spawn_preview:
+		var pos: Vector2i = entry.get("pos", Vector2i.ZERO)
 		if pos != player_pos and grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
 			grid[pos.y][pos.x] = CharacterData.CellType.ENEMY
 			enemy_spawn_turn[pos] = turn
+			enemy_pollution_dir[pos] = CharacterData.dominant_cardinal(player_pos - pos)
 	_compute_next_spawn_preview(count)
 	_refresh_visuals()
 
@@ -462,10 +469,13 @@ func _compute_next_spawn_preview(count: int) -> void:
 func _refresh_visuals() -> void:
 	for r: int in ROWS:
 		for c: int in COLS:
+			var pos: Vector2i = Vector2i(c, r)
 			cell_nodes[r][c].set_type(grid[r][c])
 			cell_nodes[r][c].set_polluted(polluted_grid[r][c])
-			cell_nodes[r][c].set_pollution_warning(_is_enemy_pollution_warning(Vector2i(c, r)))
-			cell_nodes[r][c].set_player(Vector2i(c, r) == player_pos)
+			cell_nodes[r][c].set_pollution_warning(_is_enemy_pollution_warning(pos))
+			cell_nodes[r][c].set_pollution_dir(_enemy_pollution_direction(pos))
+			cell_nodes[r][c].set_pollution_target_preview(_is_pollution_target_preview(pos))
+			cell_nodes[r][c].set_player(pos == player_pos)
 	queue_redraw()
 	if _arrow_overlay:
 		_arrow_overlay.queue_redraw()
@@ -477,6 +487,27 @@ func _is_enemy_pollution_warning(pos: Vector2i) -> bool:
 	if not _in_bounds(pos) or not CharacterData.is_enemy(grid[pos.y][pos.x]):
 		return false
 	return turn - int(enemy_spawn_turn[pos]) == 1
+
+func _enemy_pollution_direction(pos: Vector2i) -> int:
+	if not enemy_pollution_dir.has(pos):
+		return CharacterData.Direction.NONE
+	if not _in_bounds(pos) or not CharacterData.is_enemy(grid[pos.y][pos.x]):
+		return CharacterData.Direction.NONE
+	return int(enemy_pollution_dir[pos])
+
+func _is_pollution_target_preview(pos: Vector2i) -> bool:
+	for source in enemy_pollution_dir.keys():
+		var src: Vector2i = source
+		if not _in_bounds(src) or not CharacterData.is_enemy(grid[src.y][src.x]):
+			continue
+		if not _is_enemy_pollution_warning(src):
+			continue
+		var dir_id: int = int(enemy_pollution_dir[src])
+		if dir_id == CharacterData.Direction.NONE:
+			continue
+		if src + CharacterData.DIR_VECTOR[dir_id] == pos:
+			return true
+	return false
 
 func _draw() -> void:
 	var font: Font = ThemeDB.fallback_font
@@ -648,6 +679,7 @@ func _clear_enemy(p: Vector2i) -> void:
 		kill_count += 1
 		shield_spawn_turn.erase(p)
 		enemy_spawn_turn.erase(p)
+		enemy_pollution_dir.erase(p)
 
 func _move_enemy_data(from: Vector2i, to: Vector2i) -> void:
 	if shield_spawn_turn.has(from):
@@ -656,6 +688,9 @@ func _move_enemy_data(from: Vector2i, to: Vector2i) -> void:
 	if enemy_spawn_turn.has(from):
 		enemy_spawn_turn[to] = enemy_spawn_turn[from]
 		enemy_spawn_turn.erase(from)
+	if enemy_pollution_dir.has(from):
+		enemy_pollution_dir[to] = enemy_pollution_dir[from]
+		enemy_pollution_dir.erase(from)
 
 func _harden_old_shields() -> void:
 	for pos: Vector2i in shield_spawn_turn.keys():
@@ -671,6 +706,12 @@ func _spread_pollution() -> void:
 			continue
 		if CharacterData.is_enemy(grid[pos.y][pos.x]) and turn - int(enemy_spawn_turn[pos]) >= 2:
 			polluted_grid[pos.y][pos.x] = true
+			if enemy_pollution_dir.has(pos):
+				var dir_id: int = int(enemy_pollution_dir[pos])
+				if dir_id != CharacterData.Direction.NONE:
+					var target: Vector2i = pos + CharacterData.DIR_VECTOR[dir_id]
+					if _in_bounds(target):
+						polluted_grid[target.y][target.x] = true
 
 func _hit_cell(p: Vector2i, attack_dir: int) -> void:
 	if not _in_bounds(p) or not CharacterData.is_enemy(grid[p.y][p.x]):
@@ -779,6 +820,7 @@ func use_skill(slot: int) -> void:
 		"player_pos": player_pos,
 		"shield_spawn_turn": shield_spawn_turn,
 		"enemy_spawn_turn": enemy_spawn_turn,
+		"enemy_pollution_dir": enemy_pollution_dir,
 		"kill_delta": 0,
 		"bonus_moves_delta": 0,
 		"player_moved": false,
@@ -789,6 +831,7 @@ func use_skill(slot: int) -> void:
 	player_pos = live_state["player_pos"]
 	shield_spawn_turn = live_state["shield_spawn_turn"]
 	enemy_spawn_turn = live_state["enemy_spawn_turn"]
+	enemy_pollution_dir = live_state["enemy_pollution_dir"]
 	kill_count += int(live_state["kill_delta"])
 	bonus_moves += int(live_state["bonus_moves_delta"])
 	if char_config.use_rdr_classifier:
@@ -803,6 +846,7 @@ func _board_state() -> Dictionary:
 		"player_pos": player_pos,
 		"shield_spawn_turn": shield_spawn_turn.duplicate(true),
 		"enemy_spawn_turn": enemy_spawn_turn.duplicate(true),
+		"enemy_pollution_dir": enemy_pollution_dir.duplicate(true),
 		"kill_delta": 0,
 		"bonus_moves_delta": 0,
 		"player_moved": false,
@@ -835,6 +879,7 @@ func _state_clear_enemy(state: Dictionary, p: Vector2i) -> void:
 	state["grid"][p.y][p.x] = CharacterData.CellType.LIVE
 	state["shield_spawn_turn"].erase(p)
 	state["enemy_spawn_turn"].erase(p)
+	state["enemy_pollution_dir"].erase(p)
 	state["kill_delta"] += 1
 
 func _state_move_enemy_data(state: Dictionary, from: Vector2i, to: Vector2i) -> void:
@@ -844,6 +889,9 @@ func _state_move_enemy_data(state: Dictionary, from: Vector2i, to: Vector2i) -> 
 	if state["enemy_spawn_turn"].has(from):
 		state["enemy_spawn_turn"][to] = state["enemy_spawn_turn"][from]
 		state["enemy_spawn_turn"].erase(from)
+	if state["enemy_pollution_dir"].has(from):
+		state["enemy_pollution_dir"][to] = state["enemy_pollution_dir"][from]
+		state["enemy_pollution_dir"].erase(from)
 
 func _state_hit_cell(state: Dictionary, p: Vector2i, attack_dir: int) -> void:
 	if not _state_cell_is_enemy(state, p):
@@ -921,6 +969,7 @@ func _skill_changes_state(state: Dictionary, skill: Array) -> bool:
 		"player_pos": before_pos,
 		"shield_spawn_turn": state["shield_spawn_turn"].duplicate(true),
 		"enemy_spawn_turn": state["enemy_spawn_turn"].duplicate(true),
+		"enemy_pollution_dir": state["enemy_pollution_dir"].duplicate(true),
 		"kill_delta": 0,
 		"bonus_moves_delta": 0,
 		"player_moved": false,
