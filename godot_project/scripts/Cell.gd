@@ -5,6 +5,7 @@ const CELL_SIZE: float = 100.0
 var cell_type: int = CharacterData.CellType.LIVE
 var is_player: bool = false
 var is_polluted: bool = false
+var is_pollution_warning: bool = false
 var grid_pos: Vector2i = Vector2i.ZERO
 
 func set_type(t: int) -> void:
@@ -19,12 +20,16 @@ func set_polluted(v: bool) -> void:
 	is_polluted = v
 	queue_redraw()
 
+func set_pollution_warning(v: bool) -> void:
+	is_pollution_warning = v
+	queue_redraw()
+
 func _draw() -> void:
 	var rect: Rect2 = Rect2(0.0, 0.0, CELL_SIZE, CELL_SIZE)
 	draw_rect(rect, Color(0.10, 0.10, 0.13))
 	if is_polluted:
-		draw_rect(rect.grow(-4.0), Color(0.20, 0.48, 0.20, 0.75))
-		draw_rect(rect.grow(-10.0), Color(0.10, 0.22, 0.10, 0.55))
+		draw_rect(rect.grow(-4.0), Color(0.46, 0.22, 0.62, 0.78))
+		draw_rect(rect.grow(-10.0), Color(0.22, 0.08, 0.34, 0.58))
 	draw_rect(rect, Color(0.25, 0.25, 0.30), false, 1.0)
 
 	var center: Vector2 = Vector2(CELL_SIZE / 2.0, CELL_SIZE / 2.0)
@@ -41,7 +46,8 @@ func _draw() -> void:
 			center + Vector2(-r,        0.0),
 			center + Vector2(-r * 0.7, -r * 0.7),
 		])
-		draw_polygon(oct, PackedColorArray([Color(0.8, 0.15, 0.15)]))
+		var enemy_color: Color = Color(0.76, 0.22, 0.46) if is_pollution_warning else Color(0.8, 0.15, 0.15)
+		draw_polygon(oct, PackedColorArray([enemy_color]))
 		var shield_dir: int = CharacterData.get_shield_dir(cell_type)
 		if shield_dir != CharacterData.Direction.NONE:
 			var dv: Vector2i = CharacterData.DIR_VECTOR[shield_dir]

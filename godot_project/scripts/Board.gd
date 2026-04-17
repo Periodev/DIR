@@ -464,11 +464,19 @@ func _refresh_visuals() -> void:
 		for c: int in COLS:
 			cell_nodes[r][c].set_type(grid[r][c])
 			cell_nodes[r][c].set_polluted(polluted_grid[r][c])
+			cell_nodes[r][c].set_pollution_warning(_is_enemy_pollution_warning(Vector2i(c, r)))
 			cell_nodes[r][c].set_player(Vector2i(c, r) == player_pos)
 	queue_redraw()
 	if _arrow_overlay:
 		_arrow_overlay.queue_redraw()
 	board_updated.emit()
+
+func _is_enemy_pollution_warning(pos: Vector2i) -> bool:
+	if not enemy_spawn_turn.has(pos):
+		return false
+	if not _in_bounds(pos) or not CharacterData.is_enemy(grid[pos.y][pos.x]):
+		return false
+	return turn - int(enemy_spawn_turn[pos]) == 1
 
 func _draw() -> void:
 	var font: Font = ThemeDB.fallback_font
