@@ -818,13 +818,9 @@ func _draw() -> void:
 		draw_rect(temp_rect, Color(0.10, 0.10, 0.13))
 		draw_rect(action_rect, Color(0.10, 0.10, 0.13))
 		if temp_index >= 0:
-			var is_pending_attack: bool = exe_pending_attack_slot >= 0 and temp_index == action_seq.size() - 1
-			if is_pending_attack:
-				_draw_dashed_rect_outline(temp_rect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
-			else:
-				draw_rect(temp_rect, Color(0.40, 0.25, 0.08), false, 1.5)
+			_draw_dashed_rect_outline(temp_rect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
 			var temp_y: float = temp_rect.position.y + (temp_rect.size.y + font_size * 0.7) / 2.0
-			var temp_col: Color = Color(1.0, 0.72, 0.4, 0.65) if is_pending_attack else Color(1.0, 0.6, 0.15)
+			var temp_col: Color = Color(1.0, 0.72, 0.4, 0.65)
 			draw_string(font, Vector2(temp_rect.position.x, temp_y), CharacterData.DIR_ARROWS[action_seq[temp_index]],
 				HORIZONTAL_ALIGNMENT_CENTER, temp_rect.size.x, font_size, temp_col)
 		if move_index >= 0:
