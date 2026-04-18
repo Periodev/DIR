@@ -26,6 +26,7 @@ var player_pos: Vector2i = Vector2i(COLS / 2, ROWS / 2)
 var action_seq: Array[int] = []
 var action_seq_is_attack: Array[bool] = []
 var action_seq_used_for_space: Array[bool] = []
+var exe_pending_attack_slot: int = -1
 var moves_this_turn: int = 0
 var attacks_this_turn: int = 0
 var bonus_moves: int = 0
@@ -177,6 +178,7 @@ func restart() -> void:
 	action_seq.clear()
 	action_seq_is_attack.clear()
 	action_seq_used_for_space.clear()
+	exe_pending_attack_slot = -1
 	moves_this_turn = 0
 	attacks_this_turn = 0
 	bonus_moves = 0
@@ -216,6 +218,8 @@ func is_basic_move_legal(from: Vector2i, dir: int, state: Dictionary = {}) -> bo
 func try_move(dir: int) -> bool:
 	if game_over:
 		return false
+	if not _resolve_exe_pending_attack_default():
+		return false
 	if action_seq.size() >= char_config.seq_slots:
 		return false
 	if moves_this_turn >= char_config.max_moves + bonus_moves:
@@ -232,6 +236,8 @@ func try_move(dir: int) -> bool:
 
 func try_attack(dir: int) -> bool:
 	if game_over:
+		return false
+	if not _resolve_exe_pending_attack_default():
 		return false
 	if is_polluted(player_pos):
 		return false
@@ -255,7 +261,9 @@ func try_attack(dir: int) -> bool:
 		if char_config.teleport_on_kill:
 			player_pos = target
 	var killed: bool = grid[target.y][target.x] == CharacterData.CellType.LIVE
-	if not char_config.use_rdr_classifier or killed:
+	if char_config.use_exe_manual_slotting and killed:
+		_record_exe_attack_vector(dir)
+	elif not char_config.use_rdr_classifier or killed:
 		action_seq.append(dir)
 		action_seq_is_attack.append(true)
 		action_seq_used_for_space.append(false)
@@ -265,6 +273,8 @@ func try_attack(dir: int) -> bool:
 
 func try_end_turn() -> bool:
 	if game_over:
+		return false
+	if not _resolve_exe_pending_attack_default():
 		return false
 	if char_config.use_unified_slots and not char_config.use_rdr_classifier and not char_config.use_exe_manual_slotting:
 		var new_attacks: Array[int] = []
@@ -415,6 +425,8 @@ func _try_store_rdr_skill_vector() -> bool:
 	return true
 
 func _try_store_exe_skill_component() -> bool:
+	if exe_pending_attack_slot >= 0:
+		return _resolve_exe_pending_attack_with_space()
 	if action_seq.is_empty():
 		return false
 	var used_index: int = action_seq.size() - 1
@@ -444,6 +456,97 @@ func _try_store_exe_skill_component() -> bool:
 		return false
 	_refresh_visuals()
 	return true
+
+func _record_exe_attack_vector(dir_seq: int) -> void:
+	var empty_slot: int = _first_empty_skill_slot()
+	if empty_slot >= 0 and _has_existing_exe_attack_record():
+		action_seq.append(dir_seq)
+		action_seq_is_attack.append(true)
+		action_seq_used_for_space.append(false)
+		exe_pending_attack_slot = empty_slot
+		return
+	if empty_slot >= 0:
+		skill_slots[empty_slot] = [dir_seq]
+		return
+	action_seq.append(dir_seq)
+	action_seq_is_attack.append(true)
+	action_seq_used_for_space.append(false)
+
+func _resolve_exe_pending_attack_default() -> bool:
+	if exe_pending_attack_slot < 0:
+		return true
+	if exe_pending_attack_slot >= char_config.skill_slot_count:
+		exe_pending_attack_slot = -1
+		return false
+	var used_index: int = action_seq.size() - 1
+	if used_index < 0 or not action_seq_is_attack[used_index]:
+		exe_pending_attack_slot = -1
+		return true
+	if not skill_slots[exe_pending_attack_slot].is_empty():
+		exe_pending_attack_slot = -1
+		return false
+	skill_slots[exe_pending_attack_slot] = [action_seq[used_index]]
+	action_seq.remove_at(used_index)
+	action_seq_is_attack.remove_at(used_index)
+	action_seq_used_for_space.remove_at(used_index)
+	exe_pending_attack_slot = -1
+	return true
+
+func _resolve_exe_pending_attack_with_space() -> bool:
+	var used_index: int = action_seq.size() - 1
+	if used_index < 0 or not action_seq_is_attack[used_index]:
+		exe_pending_attack_slot = -1
+		return false
+	var dir_seq: int = action_seq[used_index]
+	var slot_index: int = skill_preview
+	if slot_index >= 0 and slot_index < char_config.skill_slot_count and skill_slots[slot_index].size() == 1:
+		var dir_prev: int = skill_slots[slot_index][0]
+		if CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] == Vector2i.ZERO:
+			return false
+		skill_slots[slot_index] = [dir_seq, dir_prev, true]
+		action_seq.remove_at(used_index)
+		action_seq_is_attack.remove_at(used_index)
+		action_seq_used_for_space.remove_at(used_index)
+		exe_pending_attack_slot = -1
+		_refresh_visuals()
+		return true
+	if not _resolve_exe_pending_attack_default():
+		return false
+	_refresh_visuals()
+	return true
+
+func _first_empty_skill_slot() -> int:
+	for i: int in char_config.skill_slot_count:
+		if skill_slots[i].is_empty():
+			return i
+	return -1
+
+func _has_existing_exe_attack_record() -> bool:
+	for slot_data: Array in skill_slots:
+		if not slot_data.is_empty():
+			return true
+	for i: int in action_seq.size():
+		if action_seq_is_attack[i]:
+			return true
+	return false
+
+func _draw_dashed_rect_outline(rect: Rect2, color: Color, width: float, dash_len: float, gap_len: float) -> void:
+	var left: float = rect.position.x
+	var top: float = rect.position.y
+	var right: float = rect.position.x + rect.size.x
+	var bottom: float = rect.position.y + rect.size.y
+	var x: float = left
+	while x < right:
+		var seg_end_x: float = min(x + dash_len, right)
+		draw_line(Vector2(x, top), Vector2(seg_end_x, top), color, width, true)
+		draw_line(Vector2(x, bottom), Vector2(seg_end_x, bottom), color, width, true)
+		x += dash_len + gap_len
+	var y: float = top
+	while y < bottom:
+		var seg_end_y: float = min(y + dash_len, bottom)
+		draw_line(Vector2(left, y), Vector2(left, seg_end_y), color, width, true)
+		draw_line(Vector2(right, y), Vector2(right, seg_end_y), color, width, true)
+		y += dash_len + gap_len
 
 func _find_exe_skill_slot(dir_seq: int, latest_is_attack: bool) -> int:
 	if latest_is_attack:
@@ -576,43 +679,24 @@ func _draw() -> void:
 	var board_w: float = (COLS - 1) * CELL_STEP + CELL_SIZE
 	var total_seq_w: float = (slots - 1) * SEQ_STEP + SEQ_SIZE
 	var seq_x0: float = (board_w - total_seq_w) / 2.0
-	var seq_y: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP
+	var base_ui_y: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP
+	var seq_y: float
 
 	var rem_moves: int = char_config.max_moves + bonus_moves - moves_this_turn
 	var rem_atk: int = char_config.max_attacks + bonus_attacks - attacks_this_turn
-	var cx: float = seq_x0 - 70.0
-	draw_string(font, Vector2(cx, seq_y + 28.0), str(rem_moves) + "M",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
-	draw_string(font, Vector2(cx, seq_y + 58.0), str(rem_atk) + "A",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1.0, 0.6, 0.15))
-	if is_polluted(player_pos):
-		draw_string(font, Vector2(cx - 12.0, seq_y + 88.0), "NO BASIC ATK / NO COMBINE",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.4, 0.9, 0.4))
-
-	for i: int in slots:
-		var x: float = seq_x0 + i * SEQ_STEP
-		var rect: Rect2 = Rect2(x, seq_y, SEQ_SIZE, SEQ_SIZE)
-		draw_rect(rect, Color(0.10, 0.10, 0.13))
-		var seq_locked: bool = i < action_seq_used_for_space.size() and action_seq_used_for_space[i]
-		draw_rect(rect, Color(0.18, 0.75, 0.75) if seq_locked else Color(0.30, 0.30, 0.35), false, 1.5)
-		if i < action_seq.size():
-			var arrow: String = CharacterData.DIR_ARROWS[action_seq[i]]
-			var text_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-			var col: Color = Color(0.70, 0.85, 0.85) if seq_locked else (Color(1.0, 0.6, 0.15) if action_seq_is_attack[i] else Color.WHITE)
-			draw_string(font, Vector2(x, text_y), arrow,
-				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
-
 	var skill_font_size: int = 26
 	if char_config.use_unified_slots:
 		var slot_count: int = char_config.skill_slot_count
 		var total_slot_w: float = (slot_count - 1) * SEQ_STEP + SEQ_SIZE
 		var slot_x0: float = (board_w - total_slot_w) / 2.0
-		var slot_y: float = seq_y + SEQ_SIZE + ATK_QUEUE_GAP
+		var slot_y: float = base_ui_y
+		seq_y = slot_y + SEQ_SIZE + ATK_QUEUE_GAP
 		for i: int in slot_count:
 			var sx: float = slot_x0 + i * SEQ_STEP
 			var srect: Rect2 = Rect2(sx, slot_y, SEQ_SIZE, SEQ_SIZE)
 			var is_armed: bool = skill_preview == i
 			var slot_data: Array = skill_slots[i]
+			var is_exe_pending_slot: bool = char_config.use_exe_manual_slotting and i == exe_pending_attack_slot
 			if slot_data.size() == 3:
 				draw_rect(srect, Color(0.08, 0.08, 0.18))
 				draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.35, 0.35, 0.65),
@@ -635,6 +719,12 @@ func _draw() -> void:
 				var atk_text_y: float = slot_y + (SEQ_SIZE + font_size * 0.7) / 2.0
 				draw_string(font, Vector2(sx, atk_text_y), CharacterData.DIR_ARROWS[slot_data[0]],
 					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
+			elif is_exe_pending_slot and not action_seq.is_empty():
+				draw_rect(srect, Color(0.10, 0.10, 0.13))
+				_draw_dashed_rect_outline(srect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
+				var pending_text_y: float = slot_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+				draw_string(font, Vector2(sx, pending_text_y), CharacterData.DIR_ARROWS[action_seq[-1]],
+					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.72, 0.4, 0.65))
 			else:
 				draw_rect(srect, Color(0.10, 0.10, 0.13))
 				draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.30, 0.30, 0.35),
@@ -642,12 +732,14 @@ func _draw() -> void:
 	else:
 		var skill_y: float
 		if char_config.skill_mixed:
-			skill_y = seq_y + SEQ_SIZE + SKILL_MARGIN_TOP
+			skill_y = base_ui_y
+			seq_y = skill_y + SEQ_SIZE + SKILL_MARGIN_TOP
 		else:
+			skill_y = base_ui_y
 			var atk_slots: int = char_config.attack_queue_cap
 			var total_atk_w: float = (atk_slots - 1) * SEQ_STEP + SEQ_SIZE
 			var atk_x0: float = (board_w - total_atk_w) / 2.0
-			var atk_y: float = seq_y + SEQ_SIZE + ATK_QUEUE_GAP
+			var atk_y: float = skill_y + SEQ_SIZE + SKILL_MARGIN_TOP
 			for i: int in atk_slots:
 				var ax: float = atk_x0 + i * SEQ_STEP
 				var arect: Rect2 = Rect2(ax, atk_y, SEQ_SIZE, SEQ_SIZE)
@@ -660,7 +752,7 @@ func _draw() -> void:
 					var atk_text_y: float = atk_y + (SEQ_SIZE + font_size * 0.7) / 2.0
 					draw_string(font, Vector2(ax, atk_text_y), atk_arrow,
 						HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
-			skill_y = atk_y + SEQ_SIZE + SKILL_MARGIN_TOP
+			seq_y = atk_y + SEQ_SIZE + ATK_QUEUE_GAP
 		for i: int in char_config.skill_slot_count:
 			var sx: float = i * SEQ_STEP
 			var srect: Rect2 = Rect2(sx, skill_y, SEQ_SIZE, SEQ_SIZE)
@@ -680,6 +772,30 @@ func _draw() -> void:
 				draw_string(font, Vector2(sx, skill_y + SEQ_SIZE - 2.0),
 					CharacterData.SKILL_TYPE_NAMES[stype2],
 					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
+
+	for i: int in slots:
+		var x: float = seq_x0 + i * SEQ_STEP
+		var rect: Rect2 = Rect2(x, seq_y, SEQ_SIZE, SEQ_SIZE)
+		draw_rect(rect, Color(0.10, 0.10, 0.13))
+		var seq_locked: bool = i < action_seq_used_for_space.size() and action_seq_used_for_space[i]
+		var is_exe_pending_seq: bool = char_config.use_exe_manual_slotting and exe_pending_attack_slot >= 0 and i == action_seq.size() - 1 and i < action_seq_is_attack.size() and action_seq_is_attack[i]
+		if not is_exe_pending_seq:
+			draw_rect(rect, Color(0.18, 0.75, 0.75) if seq_locked else Color(0.30, 0.30, 0.35), false, 1.5)
+		if i < action_seq.size() and not is_exe_pending_seq:
+			var arrow: String = CharacterData.DIR_ARROWS[action_seq[i]]
+			var text_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+			var col: Color = Color(0.70, 0.85, 0.85) if seq_locked else (Color(1.0, 0.6, 0.15) if action_seq_is_attack[i] else Color.WHITE)
+			draw_string(font, Vector2(x, text_y), arrow,
+				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
+
+	var cx: float = seq_x0 - 70.0
+	draw_string(font, Vector2(cx, seq_y + 28.0), str(rem_moves) + "M",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
+	draw_string(font, Vector2(cx, seq_y + 58.0), str(rem_atk) + "A",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1.0, 0.6, 0.15))
+	if is_polluted(player_pos):
+		draw_string(font, Vector2(cx - 12.0, seq_y + 88.0), "NO BASIC ATK / NO COMBINE",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.4, 0.9, 0.4))
 
 	var threat: Dictionary = score_pollution_threat()
 	var side_x: float = board_w + 28.0
@@ -1061,6 +1177,8 @@ func _has_combinable_material() -> bool:
 					return true
 			return false
 		if char_config.use_exe_manual_slotting:
+			if exe_pending_attack_slot >= 0:
+				return true
 			var used_index: int = action_seq.size() - 1
 			if used_index < 0 or used_index >= action_seq_used_for_space.size() or action_seq_used_for_space[used_index]:
 				return false
