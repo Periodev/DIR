@@ -266,7 +266,7 @@ func try_attack(dir: int) -> bool:
 func try_end_turn() -> bool:
 	if game_over:
 		return false
-	if char_config.use_unified_slots and not char_config.use_rdr_classifier:
+	if char_config.use_unified_slots and not char_config.use_rdr_classifier and not char_config.use_exe_manual_slotting:
 		var new_attacks: Array[int] = []
 		for i: int in action_seq.size():
 			if action_seq_is_attack[i]:
@@ -350,6 +350,8 @@ func try_combine_skill() -> bool:
 func _try_combine_skill_unified() -> bool:
 	if char_config.use_rdr_classifier:
 		return _try_store_rdr_skill_vector()
+	if char_config.use_exe_manual_slotting:
+		return _try_store_exe_skill_component()
 	var slot_index: int = skill_preview
 	if slot_index < 0 or slot_index >= char_config.skill_slot_count or skill_slots[slot_index].size() != 1:
 		slot_index = -1
@@ -398,15 +400,71 @@ func _try_store_rdr_skill_vector() -> bool:
 	var dir_seq: int = action_seq[-1]
 	if slot_data.is_empty():
 		skill_slots[slot_index] = [dir_seq]
+		action_seq.remove_at(used_index)
+		action_seq_is_attack.remove_at(used_index)
+		action_seq_used_for_space.remove_at(used_index)
 	elif slot_data.size() == 1:
 		var dir_prev: int = slot_data[0]
 		if CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] == Vector2i.ZERO:
 			return false
 		skill_slots[slot_index] = [dir_prev, dir_seq, false]
+		action_seq_used_for_space[used_index] = true
 	else:
 		return false
-	action_seq_used_for_space[used_index] = true
 	_refresh_visuals()
+	return true
+
+func _try_store_exe_skill_component() -> bool:
+	if action_seq.is_empty():
+		return false
+	var used_index: int = action_seq.size() - 1
+	if used_index < 0 or used_index >= action_seq_used_for_space.size() or action_seq_used_for_space[used_index]:
+		return false
+	var dir_seq: int = action_seq[-1]
+	var latest_is_attack: bool = action_seq_is_attack[used_index]
+	var slot_index: int = skill_preview
+	if slot_index >= 0 and slot_index < char_config.skill_slot_count:
+		if not _can_store_exe_skill_component(skill_slots[slot_index], dir_seq, latest_is_attack):
+			return false
+	else:
+		slot_index = _find_exe_skill_slot(dir_seq, latest_is_attack)
+		if slot_index < 0:
+			return false
+	var slot_data: Array = skill_slots[slot_index]
+	if slot_data.is_empty():
+		skill_slots[slot_index] = [dir_seq]
+		action_seq.remove_at(used_index)
+		action_seq_is_attack.remove_at(used_index)
+		action_seq_used_for_space.remove_at(used_index)
+	elif slot_data.size() == 1:
+		var dir_prev: int = slot_data[0]
+		skill_slots[slot_index] = [dir_seq, dir_prev, latest_is_attack]
+		action_seq_used_for_space[used_index] = true
+	else:
+		return false
+	_refresh_visuals()
+	return true
+
+func _find_exe_skill_slot(dir_seq: int, latest_is_attack: bool) -> int:
+	if latest_is_attack:
+		for i: int in char_config.skill_slot_count:
+			if skill_slots[i].is_empty():
+				return i
+	for i: int in char_config.skill_slot_count:
+		if _can_store_exe_skill_component(skill_slots[i], dir_seq, latest_is_attack):
+			return i
+	return -1
+
+func _can_store_exe_skill_component(slot_data: Array, dir_seq: int, latest_is_attack: bool) -> bool:
+	if slot_data.size() >= 3:
+		return false
+	if slot_data.is_empty():
+		return latest_is_attack
+	if slot_data.size() != 1:
+		return false
+	var dir_prev: int = slot_data[0]
+	if CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] == Vector2i.ZERO:
+		return false
 	return true
 
 func _try_combine_skill_mixed() -> bool:
@@ -1000,6 +1058,16 @@ func _has_combinable_material() -> bool:
 		if char_config.use_rdr_classifier:
 			for slot_data: Array in skill_slots:
 				if slot_data.size() < 3:
+					return true
+			return false
+		if char_config.use_exe_manual_slotting:
+			var used_index: int = action_seq.size() - 1
+			if used_index < 0 or used_index >= action_seq_used_for_space.size() or action_seq_used_for_space[used_index]:
+				return false
+			var dir_seq: int = action_seq[used_index]
+			var latest_is_attack: bool = action_seq_is_attack[used_index]
+			for slot_data: Array in skill_slots:
+				if _can_store_exe_skill_component(slot_data, dir_seq, latest_is_attack):
 					return true
 			return false
 		for slot_data: Array in skill_slots:

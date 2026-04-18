@@ -58,6 +58,7 @@ class Config:
 	var teleport_on_kill: bool = false
 	var skill_mixed: bool = false
 	var use_rdr_classifier: bool = false
+	var use_exe_manual_slotting: bool = false
 	var attack_queue_cap: int = 3
 	var skill_slot_count: int = 2
 	var use_unified_slots: bool = false
