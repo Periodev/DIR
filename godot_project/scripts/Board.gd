@@ -136,7 +136,7 @@ func switch_character() -> void:
 
 func toggle_spawn_mode() -> void:
 	_spawn_mode = SpawnMode.TRUE_RANDOM if _spawn_mode == SpawnMode.SEEDED else SpawnMode.SEEDED
-	_compute_next_spawn_preview(3)
+	_compute_next_spawn_preview(_spawn_count_for_turn(turn + 1))
 	_refresh_visuals()
 
 func _ready() -> void:
@@ -220,16 +220,14 @@ func try_move(dir: int) -> bool:
 		return false
 	if not _resolve_exe_pending_attack_default():
 		return false
-	if action_seq.size() >= char_config.seq_slots:
+	if not char_config.use_exe_manual_slotting and action_seq.size() >= char_config.seq_slots:
 		return false
 	if moves_this_turn >= char_config.max_moves + bonus_moves:
 		return false
 	if not is_basic_move_legal(player_pos, dir):
 		return false
 	player_pos += CharacterData.DIR_VECTOR[dir]
-	action_seq.append(dir)
-	action_seq_is_attack.append(false)
-	action_seq_used_for_space.append(false)
+	_append_action_step(dir, false)
 	moves_this_turn += 1
 	_refresh_visuals()
 	return true
@@ -241,7 +239,7 @@ func try_attack(dir: int) -> bool:
 		return false
 	if is_polluted(player_pos):
 		return false
-	if action_seq.size() >= char_config.seq_slots:
+	if not char_config.use_exe_manual_slotting and action_seq.size() >= char_config.seq_slots:
 		return false
 	if attacks_this_turn >= char_config.max_attacks + bonus_attacks:
 		return false
@@ -264,9 +262,7 @@ func try_attack(dir: int) -> bool:
 	if char_config.use_exe_manual_slotting and killed:
 		_record_exe_attack_vector(dir)
 	elif not char_config.use_rdr_classifier or killed:
-		action_seq.append(dir)
-		action_seq_is_attack.append(true)
-		action_seq_used_for_space.append(false)
+		_append_action_step(dir, true)
 	attacks_this_turn += 1
 	_refresh_visuals()
 	return true
@@ -318,7 +314,7 @@ func try_end_turn() -> bool:
 	bonus_attacks = 0
 	_harden_old_shields()
 	_spread_pollution()
-	debug_spawn_enemies(3)
+	debug_spawn_enemies(_spawn_count_for_turn(turn))
 	check_loss_state()
 	_refresh_visuals()
 	return true
@@ -460,17 +456,13 @@ func _try_store_exe_skill_component() -> bool:
 func _record_exe_attack_vector(dir_seq: int) -> void:
 	var empty_slot: int = _first_empty_skill_slot()
 	if empty_slot >= 0 and _has_existing_exe_attack_record():
-		action_seq.append(dir_seq)
-		action_seq_is_attack.append(true)
-		action_seq_used_for_space.append(false)
+		_append_action_step(dir_seq, true)
 		exe_pending_attack_slot = empty_slot
 		return
 	if empty_slot >= 0:
 		skill_slots[empty_slot] = [dir_seq]
 		return
-	action_seq.append(dir_seq)
-	action_seq_is_attack.append(true)
-	action_seq_used_for_space.append(false)
+	_append_action_step(dir_seq, true)
 
 func _resolve_exe_pending_attack_default() -> bool:
 	if exe_pending_attack_slot < 0:
@@ -521,11 +513,23 @@ func _first_empty_skill_slot() -> int:
 			return i
 	return -1
 
+func _append_action_step(dir_seq: int, is_attack: bool) -> void:
+	if char_config.use_exe_manual_slotting:
+		while action_seq.size() >= char_config.seq_slots:
+			action_seq.remove_at(0)
+			action_seq_is_attack.remove_at(0)
+			action_seq_used_for_space.remove_at(0)
+	action_seq.append(dir_seq)
+	action_seq_is_attack.append(is_attack)
+	action_seq_used_for_space.append(false)
+
 func _has_existing_exe_attack_record() -> bool:
 	for slot_data: Array in skill_slots:
-		if not slot_data.is_empty():
+		if slot_data.size() == 1:
 			return true
 	for i: int in action_seq.size():
+		if i < action_seq_used_for_space.size() and action_seq_used_for_space[i]:
+			continue
 		if action_seq_is_attack[i]:
 			return true
 	return false
@@ -547,6 +551,29 @@ func _draw_dashed_rect_outline(rect: Rect2, color: Color, width: float, dash_len
 		draw_line(Vector2(left, y), Vector2(left, seg_end_y), color, width, true)
 		draw_line(Vector2(right, y), Vector2(right, seg_end_y), color, width, true)
 		y += dash_len + gap_len
+
+func _get_exe_latest_move_index() -> int:
+	for i: int in range(action_seq.size() - 1, -1, -1):
+		var is_pending_attack: bool = exe_pending_attack_slot >= 0 and i == action_seq.size() - 1 and i < action_seq_is_attack.size() and action_seq_is_attack[i]
+		if is_pending_attack:
+			continue
+		if i < action_seq_is_attack.size() and not action_seq_is_attack[i]:
+			if i < action_seq_used_for_space.size() and action_seq_used_for_space[i]:
+				return -1
+			return i
+	return -1
+
+func _get_exe_temp_attack_index() -> int:
+	if exe_pending_attack_slot >= 0 and not action_seq.is_empty():
+		var pending_index: int = action_seq.size() - 1
+		if pending_index < action_seq_is_attack.size() and action_seq_is_attack[pending_index]:
+			return pending_index
+	for i: int in range(action_seq.size() - 1, -1, -1):
+		if i < action_seq_is_attack.size() and action_seq_is_attack[i]:
+			if i < action_seq_used_for_space.size() and action_seq_used_for_space[i]:
+				return -1
+			return i
+	return -1
 
 func _find_exe_skill_slot(dir_seq: int, latest_is_attack: bool) -> int:
 	if latest_is_attack:
@@ -601,6 +628,9 @@ func _spawn_order(seed: int) -> Array[Vector2i]:
 		all[i] = all[j]
 		all[j] = tmp
 	return all
+
+func _spawn_count_for_turn(spawn_turn: int) -> int:
+	return 2 if spawn_turn <= 2 else 3
 
 func _build_spawn_preview(count: int, seed: int) -> Array:
 	var result: Array = []
@@ -685,11 +715,17 @@ func _draw() -> void:
 	var rem_moves: int = char_config.max_moves + bonus_moves - moves_this_turn
 	var rem_atk: int = char_config.max_attacks + bonus_attacks - attacks_this_turn
 	var skill_font_size: int = 26
+	var exe_slot_x0: float = 0.0
+	var exe_slot_y: float = base_ui_y
 	if char_config.use_unified_slots:
 		var slot_count: int = char_config.skill_slot_count
 		var total_slot_w: float = (slot_count - 1) * SEQ_STEP + SEQ_SIZE
 		var slot_x0: float = (board_w - total_slot_w) / 2.0
+		if char_config.use_exe_manual_slotting:
+			slot_x0 += 24.0
 		var slot_y: float = base_ui_y
+		exe_slot_x0 = slot_x0
+		exe_slot_y = slot_y
 		seq_y = slot_y + SEQ_SIZE + ATK_QUEUE_GAP
 		for i: int in slot_count:
 			var sx: float = slot_x0 + i * SEQ_STEP
@@ -722,9 +758,6 @@ func _draw() -> void:
 			elif is_exe_pending_slot and not action_seq.is_empty():
 				draw_rect(srect, Color(0.10, 0.10, 0.13))
 				_draw_dashed_rect_outline(srect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
-				var pending_text_y: float = slot_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-				draw_string(font, Vector2(sx, pending_text_y), CharacterData.DIR_ARROWS[action_seq[-1]],
-					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.72, 0.4, 0.65))
 			else:
 				draw_rect(srect, Color(0.10, 0.10, 0.13))
 				draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.30, 0.30, 0.35),
@@ -773,22 +806,49 @@ func _draw() -> void:
 					CharacterData.SKILL_TYPE_NAMES[stype2],
 					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
 
-	for i: int in slots:
-		var x: float = seq_x0 + i * SEQ_STEP
-		var rect: Rect2 = Rect2(x, seq_y, SEQ_SIZE, SEQ_SIZE)
-		draw_rect(rect, Color(0.10, 0.10, 0.13))
-		var seq_locked: bool = i < action_seq_used_for_space.size() and action_seq_used_for_space[i]
-		var is_exe_pending_seq: bool = char_config.use_exe_manual_slotting and exe_pending_attack_slot >= 0 and i == action_seq.size() - 1 and i < action_seq_is_attack.size() and action_seq_is_attack[i]
-		if not is_exe_pending_seq:
-			draw_rect(rect, Color(0.18, 0.75, 0.75) if seq_locked else Color(0.30, 0.30, 0.35), false, 1.5)
-		if i < action_seq.size() and not is_exe_pending_seq:
-			var arrow: String = CharacterData.DIR_ARROWS[action_seq[i]]
-			var text_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-			var col: Color = Color(0.70, 0.85, 0.85) if seq_locked else (Color(1.0, 0.6, 0.15) if action_seq_is_attack[i] else Color.WHITE)
-			draw_string(font, Vector2(x, text_y), arrow,
-				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
+	var cx: float
+	if char_config.use_exe_manual_slotting:
+		var temp_x: float = exe_slot_x0 - SEQ_STEP
+		var action_x: float = seq_x0
+		var temp_size: float = SEQ_SIZE + 10.0
+		var temp_rect: Rect2 = Rect2(temp_x - 5.0, exe_slot_y - 5.0, temp_size, temp_size)
+		var action_rect: Rect2 = Rect2(action_x, seq_y, SEQ_SIZE, SEQ_SIZE)
+		var temp_index: int = _get_exe_temp_attack_index()
+		var move_index: int = _get_exe_latest_move_index()
+		draw_rect(temp_rect, Color(0.10, 0.10, 0.13))
+		draw_rect(action_rect, Color(0.10, 0.10, 0.13))
+		if temp_index >= 0:
+			var is_pending_attack: bool = exe_pending_attack_slot >= 0 and temp_index == action_seq.size() - 1
+			if is_pending_attack:
+				_draw_dashed_rect_outline(temp_rect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
+			else:
+				draw_rect(temp_rect, Color(0.40, 0.25, 0.08), false, 1.5)
+			var temp_y: float = temp_rect.position.y + (temp_rect.size.y + font_size * 0.7) / 2.0
+			var temp_col: Color = Color(1.0, 0.72, 0.4, 0.65) if is_pending_attack else Color(1.0, 0.6, 0.15)
+			draw_string(font, Vector2(temp_rect.position.x, temp_y), CharacterData.DIR_ARROWS[action_seq[temp_index]],
+				HORIZONTAL_ALIGNMENT_CENTER, temp_rect.size.x, font_size, temp_col)
+		if move_index >= 0:
+			draw_rect(action_rect, Color(0.30, 0.30, 0.35), false, 1.5)
+			var move_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+			draw_string(font, Vector2(action_x, move_y), CharacterData.DIR_ARROWS[action_seq[move_index]],
+				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color.WHITE)
+		cx = temp_x - 70.0
+	else:
+		for i: int in slots:
+			var x: float = seq_x0 + i * SEQ_STEP
+			var rect: Rect2 = Rect2(x, seq_y, SEQ_SIZE, SEQ_SIZE)
+			draw_rect(rect, Color(0.10, 0.10, 0.13))
+			var is_hidden_used: bool = i < action_seq_used_for_space.size() and action_seq_used_for_space[i]
+			if not is_hidden_used:
+				draw_rect(rect, Color(0.30, 0.30, 0.35), false, 1.5)
+			if i < action_seq.size() and not is_hidden_used:
+				var arrow: String = CharacterData.DIR_ARROWS[action_seq[i]]
+				var text_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+				var col: Color = Color(1.0, 0.6, 0.15) if action_seq_is_attack[i] else Color.WHITE
+				draw_string(font, Vector2(x, text_y), arrow,
+					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
+		cx = seq_x0 - 70.0
 
-	var cx: float = seq_x0 - 70.0
 	draw_string(font, Vector2(cx, seq_y + 28.0), str(rem_moves) + "M",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
 	draw_string(font, Vector2(cx, seq_y + 58.0), str(rem_atk) + "A",

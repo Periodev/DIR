@@ -3,7 +3,7 @@ extends RefCounted
 
 static func get_config() -> CharacterData.Config:
 	var c := CharacterData.Config.new()
-	c.seq_slots  = 6
+	c.seq_slots  = 2
 	c.max_moves  = 3
 	c.max_attacks = 2
 	c.skill_slot_count = 4
