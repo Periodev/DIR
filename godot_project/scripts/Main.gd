@@ -42,6 +42,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	if keycode == KEY_F6:
+		board.toggle_play_mode()
+		get_viewport().set_input_as_handled()
+		return
+
 	if not board.can_accept_input():
 		return
 

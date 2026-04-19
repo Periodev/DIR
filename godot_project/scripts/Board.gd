@@ -23,6 +23,8 @@ const EXE_STAT_LABELS: Dictionary = {
 signal board_updated
 
 enum SpawnMode { SEEDED, TRUE_RANDOM }
+enum PlayMode { NORMAL, GUARD }
+enum GuardQuadrant { TL, TR, BL, BR }
 
 var char_config: CharacterData.Config = null
 var _char_index: int = 0
@@ -54,13 +56,17 @@ var kill_count: int = 0
 var shield_spawn_turn: Dictionary = {}
 var enemy_spawn_turn: Dictionary = {}
 var enemy_pollution_dir: Dictionary = {}
+var guard_control_quadrant: Dictionary = {}
 var game_over: bool = false
 var game_over_reason: String = ""
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _next_spawn_preview: Array = []
 var _spawn_mode: int = SpawnMode.SEEDED
+var _play_mode: int = PlayMode.NORMAL
 var _debug_skill_slot_override: int = -1
+var _guard_quadrant_counts: Array = [0, 0, 0, 0]
+var _guard_active_quadrant: int = -1
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 const _RDR_SCRIPT = preload("res://scripts/CharacterImpl_RDR.gd")
@@ -84,6 +90,33 @@ class ArrowOverlay extends Node2D:
 		var cell_size_: float = board.CELL_SIZE
 		var cell_gap_: float = board.CELL_GAP
 		var cell_step_: float = board.CELL_STEP
+
+		if board.is_guard_mode():
+			var center: Vector2i = Vector2i(cols_ / 2, rows_ / 2)
+			draw_rect(
+				Rect2(center.x * cell_step_ + 5.0, center.y * cell_step_ + 5.0, cell_size_ - 10.0, cell_size_ - 10.0),
+				Color(0.45, 0.95, 1.0, 0.95),
+				false,
+				4.0
+			)
+			var active_quadrant: int = board.get_guard_active_quadrant()
+			var preview_quadrant: int = board.get_guard_preview_quadrant()
+			if preview_quadrant >= 0:
+				_draw_guard_corner_mark(preview_quadrant, Color(0.45, 0.95, 1.0, 0.9), cols_, rows_, cell_size_, cell_step_)
+			if active_quadrant >= 0:
+				_draw_guard_corner_mark(active_quadrant, Color(1.0, 0.35, 0.35, 0.95), cols_, rows_, cell_size_, cell_step_)
+				var active_rect: Rect2i = board.get_guard_quadrant_rect(active_quadrant)
+				draw_rect(
+					Rect2(
+						active_rect.position.x * cell_step_ + 3.0,
+						active_rect.position.y * cell_step_ + 3.0,
+						(active_rect.size.x - 1) * cell_step_ + cell_size_ - 6.0,
+						(active_rect.size.y - 1) * cell_step_ + cell_size_ - 6.0
+					),
+					Color(1.0, 0.35, 0.35, 0.95),
+					false,
+					4.0
+				)
 
 		for dir_id: int in CharacterData.DIR_VECTOR:
 			var dv: Vector2i = CharacterData.DIR_VECTOR[dir_id]
@@ -140,6 +173,35 @@ class ArrowOverlay extends Node2D:
 							Color(1.0, 0.3, 0.3, 0.4)
 						)
 
+	func _draw_guard_corner_mark(quadrant: int, mark_color: Color, cols_: int, rows_: int, cell_size_: float, cell_step_: float) -> void:
+		var corner: Vector2
+		var h_dir: float
+		var v_dir: float
+		match quadrant:
+			board.GuardQuadrant.TL:
+				corner = Vector2(4.0, 4.0)
+				h_dir = 1.0
+				v_dir = 1.0
+			board.GuardQuadrant.TR:
+				corner = Vector2((cols_ - 1) * cell_step_ + cell_size_ - 4.0, 4.0)
+				h_dir = -1.0
+				v_dir = 1.0
+			board.GuardQuadrant.BL:
+				corner = Vector2(4.0, (rows_ - 1) * cell_step_ + cell_size_ - 4.0)
+				h_dir = 1.0
+				v_dir = -1.0
+			board.GuardQuadrant.BR:
+				corner = Vector2((cols_ - 1) * cell_step_ + cell_size_ - 4.0, (rows_ - 1) * cell_step_ + cell_size_ - 4.0)
+				h_dir = -1.0
+				v_dir = -1.0
+			_:
+				corner = Vector2.ZERO
+				h_dir = 0.0
+				v_dir = 0.0
+		var mark_len: float = 54.0
+		draw_line(corner, corner + Vector2(mark_len * h_dir, 0.0), mark_color, 5.0, true)
+		draw_line(corner, corner + Vector2(0.0, mark_len * v_dir), mark_color, 5.0, true)
+
 func _load_char_config() -> void:
 	char_config = ([_EXE_SCRIPT, _RDR_SCRIPT][_char_index]).get_config()
 	if _debug_skill_slot_override > 0:
@@ -153,9 +215,28 @@ func toggle_debug_skill_slots() -> void:
 	_debug_skill_slot_override = -1 if _debug_skill_slot_override > 0 else 8
 	restart()
 
+func toggle_play_mode() -> void:
+	_play_mode = PlayMode.GUARD if _play_mode == PlayMode.NORMAL else PlayMode.NORMAL
+	restart()
+
+func is_guard_mode() -> bool:
+	return _play_mode == PlayMode.GUARD
+
+func get_guard_preview_quadrant() -> int:
+	if _play_mode != PlayMode.GUARD or _next_spawn_preview.is_empty():
+		return -1
+	return int(_next_spawn_preview[0].get("quadrant", -1))
+
+func get_guard_active_quadrant() -> int:
+	return _guard_active_quadrant if _play_mode == PlayMode.GUARD else -1
+
+func get_guard_quadrant_rect(quadrant: int) -> Rect2i:
+	return _guard_quadrant_rect(quadrant)
+
 func toggle_spawn_mode() -> void:
 	_spawn_mode = SpawnMode.TRUE_RANDOM if _spawn_mode == SpawnMode.SEEDED else SpawnMode.SEEDED
-	_compute_next_spawn_preview(_spawn_count_for_turn(turn + 1))
+	if _play_mode == PlayMode.NORMAL:
+		_compute_next_spawn_preview(_spawn_count_for_turn(turn + 1))
 	_refresh_visuals()
 
 func _ready() -> void:
@@ -218,9 +299,14 @@ func restart() -> void:
 	shield_spawn_turn.clear()
 	enemy_spawn_turn.clear()
 	enemy_pollution_dir.clear()
+	guard_control_quadrant.clear()
+	_guard_quadrant_counts = [0, 0, 0, 0]
+	_guard_active_quadrant = -1
 	game_over = false
 	game_over_reason = ""
 	_next_spawn_preview.clear()
+	if _play_mode == PlayMode.GUARD:
+		_compute_next_guard_preview()
 	_refresh_visuals()
 
 func is_polluted(pos: Vector2i) -> bool:
@@ -339,8 +425,13 @@ func try_end_turn() -> bool:
 	bonus_moves = 0
 	bonus_attacks = 0
 	_harden_old_shields()
-	_spread_pollution()
-	debug_spawn_enemies(_spawn_count_for_turn(turn))
+	if _play_mode == PlayMode.GUARD:
+		_spread_guard_pollution()
+		_spawn_guard_controls()
+		_compute_next_guard_preview()
+	else:
+		_spread_pollution()
+		debug_spawn_enemies(_spawn_count_for_turn(turn))
 	check_loss_state()
 	_refresh_visuals()
 	return true
@@ -758,6 +849,13 @@ func _build_spawn_preview(count: int, seed: int) -> Array:
 	return result
 
 func debug_spawn_enemies(count: int) -> void:
+	if _play_mode == PlayMode.GUARD:
+		if _next_spawn_preview.is_empty():
+			_compute_next_guard_preview()
+		_spawn_guard_controls()
+		_compute_next_guard_preview()
+		_refresh_visuals()
+		return
 	if _next_spawn_preview.is_empty():
 		_next_spawn_preview = _build_spawn_preview(count, turn)
 	for entry: Dictionary in _next_spawn_preview:
@@ -771,6 +869,127 @@ func debug_spawn_enemies(count: int) -> void:
 
 func _compute_next_spawn_preview(count: int) -> void:
 	_next_spawn_preview = _build_spawn_preview(count, turn + 1)
+
+func _guard_quadrant_origin(quadrant: int) -> Vector2i:
+	match quadrant:
+		GuardQuadrant.TL:
+			return Vector2i(0, 0)
+		GuardQuadrant.TR:
+			return Vector2i(COLS - 1, 0)
+		GuardQuadrant.BL:
+			return Vector2i(0, ROWS - 1)
+		GuardQuadrant.BR:
+			return Vector2i(COLS - 1, ROWS - 1)
+		_:
+			return Vector2i.ZERO
+
+func _guard_quadrant_rect(quadrant: int) -> Rect2i:
+	match quadrant:
+		GuardQuadrant.TL:
+			return Rect2i(0, 0, 4, 4)
+		GuardQuadrant.TR:
+			return Rect2i(1, 0, 4, 4)
+		GuardQuadrant.BL:
+			return Rect2i(0, 1, 4, 4)
+		GuardQuadrant.BR:
+			return Rect2i(1, 1, 4, 4)
+		_:
+			return Rect2i(0, 0, COLS, ROWS)
+
+func _choose_guard_quadrant() -> int:
+	var candidates: Array = []
+	for quadrant: int in range(4):
+		var counts: Array = _guard_quadrant_counts.duplicate()
+		counts[quadrant] += 1
+		var low: int = counts[0]
+		var high: int = counts[0]
+		for count: int in counts:
+			low = min(low, count)
+			high = max(high, count)
+		if high - low < 3:
+			candidates.append(quadrant)
+	if candidates.is_empty():
+		candidates = [GuardQuadrant.TL, GuardQuadrant.TR, GuardQuadrant.BL, GuardQuadrant.BR]
+	return candidates[_rng.randi_range(0, candidates.size() - 1)]
+
+func _compute_next_guard_preview() -> void:
+	var quadrant: int = _choose_guard_quadrant()
+	_guard_quadrant_counts[quadrant] += 1
+	_next_spawn_preview = _build_guard_spawn_preview(quadrant, 3)
+
+func _build_guard_spawn_preview(quadrant: int, count: int) -> Array:
+	var result: Array = []
+	var cells: Array = []
+	for y: int in ROWS:
+		for x: int in COLS:
+			cells.append(Vector2i(x, y))
+	for i: int in range(cells.size() - 1, 0, -1):
+		var j: int = _rng.randi_range(0, i)
+		var tmp: Vector2i = cells[i]
+		cells[i] = cells[j]
+		cells[j] = tmp
+	for pos: Vector2i in cells:
+		if result.size() >= count:
+			break
+		if pos != player_pos and grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
+			result.append({
+				"pos": pos,
+				"quadrant": quadrant,
+			})
+	return result
+
+func _spawn_guard_controls() -> void:
+	_guard_active_quadrant = get_guard_preview_quadrant()
+	for entry: Dictionary in _next_spawn_preview:
+		var pos: Vector2i = entry.get("pos", Vector2i.ZERO)
+		var quadrant: int = int(entry.get("quadrant", GuardQuadrant.TL))
+		if pos != player_pos and _in_bounds(pos) and grid[pos.y][pos.x] == CharacterData.CellType.LIVE:
+			grid[pos.y][pos.x] = CharacterData.CellType.ENEMY
+			guard_control_quadrant[pos] = quadrant
+
+func _spread_guard_pollution() -> void:
+	var controls: Array = guard_control_quadrant.keys()
+	for source in controls:
+		var pos: Vector2i = source
+		if not _in_bounds(pos) or not CharacterData.is_enemy(grid[pos.y][pos.x]):
+			guard_control_quadrant.erase(pos)
+	if _guard_active_quadrant < 0:
+		return
+	var grow_count: int = min(_count_guard_controls_in_quadrant_rect(_guard_active_quadrant), 3)
+	for _i: int in grow_count:
+		_grow_guard_pollution(_guard_active_quadrant)
+
+func _count_guard_controls_in_quadrant_rect(quadrant: int) -> int:
+	var rect: Rect2i = _guard_quadrant_rect(quadrant)
+	var total: int = 0
+	for source in guard_control_quadrant.keys():
+		var pos: Vector2i = source
+		if not _in_bounds(pos) or not CharacterData.is_enemy(grid[pos.y][pos.x]):
+			continue
+		if pos.x >= rect.position.x and pos.x < rect.position.x + rect.size.x \
+		and pos.y >= rect.position.y and pos.y < rect.position.y + rect.size.y:
+			total += 1
+	return total
+
+func _grow_guard_pollution(quadrant: int) -> void:
+	var origin: Vector2i = _guard_quadrant_origin(quadrant)
+	var best_depth: int = 999
+	var candidates: Array = []
+	for y: int in ROWS:
+		for x: int in COLS:
+			if polluted_grid[y][x]:
+				continue
+			var pos: Vector2i = Vector2i(x, y)
+			var depth: int = abs(pos.x - origin.x) + abs(pos.y - origin.y)
+			if depth < best_depth:
+				best_depth = depth
+				candidates = [pos]
+			elif depth == best_depth:
+				candidates.append(pos)
+	if candidates.is_empty():
+		return
+	var picked: Vector2i = candidates[_rng.randi_range(0, candidates.size() - 1)]
+	polluted_grid[picked.y][picked.x] = true
 
 func _refresh_visuals() -> void:
 	for r: int in ROWS:
@@ -977,27 +1196,31 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
 	draw_string(font, Vector2(side_x, 118.0), "SEEDED" if _spawn_mode == SpawnMode.SEEDED else "RANDOM",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 0.95))
-	draw_string(font, Vector2(side_x, 152.0), "KILL",
+	draw_string(font, Vector2(side_x, 146.0), "MODE",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 192.0), str(kill_count),
+	draw_string(font, Vector2(side_x, 170.0), "GUARD" if _play_mode == PlayMode.GUARD else "NORMAL",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 0.95))
+	draw_string(font, Vector2(side_x, 204.0), "KILL",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+	draw_string(font, Vector2(side_x, 244.0), str(kill_count),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color(1.0, 0.4, 0.4))
-	draw_string(font, Vector2(side_x, 226.0), "THREAT",
+	draw_string(font, Vector2(side_x, 278.0), "THREAT",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 266.0), str(threat["score"]),
+	draw_string(font, Vector2(side_x, 318.0), str(threat["score"]),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.45, 0.9, 0.45))
-	draw_string(font, Vector2(side_x, 300.0), "AVG SLOT",
+	draw_string(font, Vector2(side_x, 352.0), "AVG SLOT",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 340.0), "%.1f" % avg_slot_usage,
+	draw_string(font, Vector2(side_x, 392.0), "%.1f" % avg_slot_usage,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.95, 0.9, 0.55))
-	draw_string(font, Vector2(side_x, 374.0), "MOVE%",
+	draw_string(font, Vector2(side_x, 426.0), "MOVE%",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 414.0), "%.0f%%" % (move_usage_ratio * 100.0),
+	draw_string(font, Vector2(side_x, 466.0), "%.0f%%" % (move_usage_ratio * 100.0),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.85, 0.95, 1.0))
 	if char_config.use_exe_manual_slotting:
 		var total_synth: int = _get_total_exe_skill_syntheses()
-		draw_string(font, Vector2(side_x, 454.0), "EXE SKILL",
+		draw_string(font, Vector2(side_x, 506.0), "EXE SKILL",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-		draw_string(font, Vector2(side_x, 478.0), "SKL S% K R%",
+		draw_string(font, Vector2(side_x, 530.0), "SKL S% K R%",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.7, 0.75))
 		for i: int in EXE_STAT_KEYS.size():
 			var key: String = EXE_STAT_KEYS[i]
@@ -1015,7 +1238,7 @@ func _draw() -> void:
 				avg_kills,
 				recovery_pct,
 			]
-			draw_string(font, Vector2(side_x, 500.0 + i * 18.0), row_text,
+			draw_string(font, Vector2(side_x, 552.0 + i * 18.0), row_text,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.9, 0.9, 0.95))
 	if game_over:
 		draw_rect(Rect2(-14.0, -14.0, board_w + 160.0, ROWS * CELL_STEP + 30.0), Color(0, 0, 0, 0.35))
@@ -1058,6 +1281,7 @@ func _clear_enemy(p: Vector2i) -> void:
 		shield_spawn_turn.erase(p)
 		enemy_spawn_turn.erase(p)
 		enemy_pollution_dir.erase(p)
+		guard_control_quadrant.erase(p)
 
 func _move_enemy_data(from: Vector2i, to: Vector2i) -> void:
 	if shield_spawn_turn.has(from):
@@ -1069,6 +1293,9 @@ func _move_enemy_data(from: Vector2i, to: Vector2i) -> void:
 	if enemy_pollution_dir.has(from):
 		enemy_pollution_dir[to] = enemy_pollution_dir[from]
 		enemy_pollution_dir.erase(from)
+	if guard_control_quadrant.has(from):
+		guard_control_quadrant[to] = guard_control_quadrant[from]
+		guard_control_quadrant.erase(from)
 
 func _harden_old_shields() -> void:
 	for pos: Vector2i in shield_spawn_turn.keys():
@@ -1200,6 +1427,7 @@ func use_skill(slot: int) -> void:
 		"shield_spawn_turn": shield_spawn_turn,
 		"enemy_spawn_turn": enemy_spawn_turn,
 		"enemy_pollution_dir": enemy_pollution_dir,
+		"guard_control_quadrant": guard_control_quadrant,
 		"kill_delta": 0,
 		"bonus_moves_delta": 0,
 		"recovered_dirs": [],
@@ -1212,6 +1440,7 @@ func use_skill(slot: int) -> void:
 	shield_spawn_turn = live_state["shield_spawn_turn"]
 	enemy_spawn_turn = live_state["enemy_spawn_turn"]
 	enemy_pollution_dir = live_state["enemy_pollution_dir"]
+	guard_control_quadrant = live_state["guard_control_quadrant"]
 	kill_count += int(live_state["kill_delta"])
 	bonus_moves += int(live_state["bonus_moves_delta"])
 	if char_config.use_rdr_classifier:
@@ -1231,6 +1460,7 @@ func _board_state() -> Dictionary:
 		"shield_spawn_turn": shield_spawn_turn.duplicate(true),
 		"enemy_spawn_turn": enemy_spawn_turn.duplicate(true),
 		"enemy_pollution_dir": enemy_pollution_dir.duplicate(true),
+		"guard_control_quadrant": guard_control_quadrant.duplicate(true),
 		"kill_delta": 0,
 		"bonus_moves_delta": 0,
 		"recovered_dirs": [],
@@ -1265,6 +1495,7 @@ func _state_clear_enemy(state: Dictionary, p: Vector2i) -> void:
 	state["shield_spawn_turn"].erase(p)
 	state["enemy_spawn_turn"].erase(p)
 	state["enemy_pollution_dir"].erase(p)
+	state["guard_control_quadrant"].erase(p)
 	state["kill_delta"] += 1
 
 func _state_move_enemy_data(state: Dictionary, from: Vector2i, to: Vector2i) -> void:
@@ -1277,6 +1508,9 @@ func _state_move_enemy_data(state: Dictionary, from: Vector2i, to: Vector2i) -> 
 	if state["enemy_pollution_dir"].has(from):
 		state["enemy_pollution_dir"][to] = state["enemy_pollution_dir"][from]
 		state["enemy_pollution_dir"].erase(from)
+	if state["guard_control_quadrant"].has(from):
+		state["guard_control_quadrant"][to] = state["guard_control_quadrant"][from]
+		state["guard_control_quadrant"].erase(from)
 
 func _state_hit_cell(state: Dictionary, p: Vector2i, attack_dir: int) -> void:
 	if not _state_cell_is_enemy(state, p):
@@ -1377,6 +1611,7 @@ func _skill_changes_state(state: Dictionary, skill: Array) -> bool:
 		"shield_spawn_turn": state["shield_spawn_turn"].duplicate(true),
 		"enemy_spawn_turn": state["enemy_spawn_turn"].duplicate(true),
 		"enemy_pollution_dir": state["enemy_pollution_dir"].duplicate(true),
+		"guard_control_quadrant": state["guard_control_quadrant"].duplicate(true),
 		"kill_delta": 0,
 		"bonus_moves_delta": 0,
 		"recovered_dirs": [],
@@ -1429,6 +1664,13 @@ func _has_combinable_material() -> bool:
 	return not attack_queue.is_empty()
 
 func check_loss_state() -> bool:
+	if _play_mode == PlayMode.GUARD:
+		var center: Vector2i = Vector2i(COLS / 2, ROWS / 2)
+		if is_polluted(center):
+			game_over = true
+			game_over_reason = "Guard point polluted."
+			return true
+		return false
 	if not is_polluted(player_pos):
 		return false
 	if _count_legal_moves_at(player_pos) > 0:
