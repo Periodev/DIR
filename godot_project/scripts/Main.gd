@@ -10,22 +10,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var keycode: Key = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
 
-	if keycode == KEY_Z:
-		board.set_skill_preview(0 if board.skill_preview != 0 else -1)
-		get_viewport().set_input_as_handled()
-		return
-	if keycode == KEY_X:
-		board.set_skill_preview(1 if board.skill_preview != 1 else -1)
-		get_viewport().set_input_as_handled()
-		return
-	if keycode == KEY_C:
-		board.set_skill_preview(2 if board.skill_preview != 2 else -1)
-		get_viewport().set_input_as_handled()
-		return
-	if keycode == KEY_V:
-		board.set_skill_preview(3 if board.skill_preview != 3 else -1)
-		get_viewport().set_input_as_handled()
-		return
+	var skill_keycodes: Array[Key] = [KEY_Z, KEY_X, KEY_C, KEY_V, KEY_B, KEY_N, KEY_M, KEY_COMMA]
+	for i: int in skill_keycodes.size():
+		if keycode == skill_keycodes[i]:
+			board.set_skill_preview(i if board.skill_preview != i else -1)
+			get_viewport().set_input_as_handled()
+			return
 
 	if keycode == KEY_R:
 		board.restart()
@@ -44,6 +34,11 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if keycode == KEY_F4:
 		board.toggle_spawn_mode()
+		get_viewport().set_input_as_handled()
+		return
+
+	if keycode == KEY_F5:
+		board.toggle_debug_skill_slots()
 		get_viewport().set_input_as_handled()
 		return
 

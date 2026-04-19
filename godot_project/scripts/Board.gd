@@ -12,6 +12,13 @@ const SEQ_STEP: float = SEQ_SIZE + SEQ_GAP
 const SEQ_MARGIN_TOP: float = 20.0
 const ATK_QUEUE_GAP: float = 12.0
 const SKILL_MARGIN_TOP: float = 20.0
+const EXE_STAT_KEYS: Array[String] = ["pierce", "ram", "spin", "dual"]
+const EXE_STAT_LABELS: Dictionary = {
+	"pierce": "PEN",
+	"ram": "RAM",
+	"spin": "SPN",
+	"dual": "DBL",
+}
 
 signal board_updated
 
@@ -32,6 +39,11 @@ var attacks_this_turn: int = 0
 var bonus_moves: int = 0
 var bonus_attacks: int = 0
 var turn: int = 1
+var avg_slot_sum: int = 0
+var avg_slot_samples: int = 0
+var step_move_count: int = 0
+var step_attack_count: int = 0
+var exe_skill_stats: Dictionary = {}
 
 var attack_queue: Array[int] = []
 var attack_queue_highlighted: int = -1
@@ -48,6 +60,7 @@ var game_over_reason: String = ""
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _next_spawn_preview: Array = []
 var _spawn_mode: int = SpawnMode.SEEDED
+var _debug_skill_slot_override: int = -1
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 const _RDR_SCRIPT = preload("res://scripts/CharacterImpl_RDR.gd")
@@ -129,9 +142,15 @@ class ArrowOverlay extends Node2D:
 
 func _load_char_config() -> void:
 	char_config = ([_EXE_SCRIPT, _RDR_SCRIPT][_char_index]).get_config()
+	if _debug_skill_slot_override > 0:
+		char_config.skill_slot_count = _debug_skill_slot_override
 
 func switch_character() -> void:
 	_char_index = (_char_index + 1) % 2
+	restart()
+
+func toggle_debug_skill_slots() -> void:
+	_debug_skill_slot_override = -1 if _debug_skill_slot_override > 0 else 8
 	restart()
 
 func toggle_spawn_mode() -> void:
@@ -184,6 +203,11 @@ func restart() -> void:
 	bonus_moves = 0
 	bonus_attacks = 0
 	turn = 1
+	avg_slot_sum = 0
+	avg_slot_samples = 0
+	step_move_count = 0
+	step_attack_count = 0
+	_reset_exe_skill_stats()
 	attack_queue.clear()
 	attack_queue_highlighted = -1
 	skill_slots.resize(char_config.skill_slot_count)
@@ -229,6 +253,7 @@ func try_move(dir: int) -> bool:
 	player_pos += CharacterData.DIR_VECTOR[dir]
 	_append_action_step(dir, false)
 	moves_this_turn += 1
+	_record_step_stats(true, false)
 	_refresh_visuals()
 	return true
 
@@ -264,6 +289,7 @@ func try_attack(dir: int) -> bool:
 	elif not char_config.use_rdr_classifier or killed:
 		_append_action_step(dir, true)
 	attacks_this_turn += 1
+	_record_step_stats(false, true)
 	_refresh_visuals()
 	return true
 
@@ -319,6 +345,87 @@ func try_end_turn() -> bool:
 	_refresh_visuals()
 	return true
 
+func _count_occupied_skill_slots() -> int:
+	var occupied: int = 0
+	for slot_data: Array in skill_slots:
+		if not slot_data.is_empty():
+			occupied += 1
+	return occupied
+
+func _record_slot_usage_sample() -> void:
+	avg_slot_sum += _count_occupied_skill_slots()
+	avg_slot_samples += 1
+
+func _record_step_stats(is_move: bool, is_attack: bool) -> void:
+	if is_move:
+		step_move_count += 1
+	if is_attack:
+		step_attack_count += 1
+	_record_slot_usage_sample()
+
+func _get_average_slot_usage() -> float:
+	if avg_slot_samples <= 0:
+		return 0.0
+	return float(avg_slot_sum) / float(avg_slot_samples)
+
+func _get_move_usage_ratio() -> float:
+	var total_steps: int = step_move_count + step_attack_count
+	if total_steps <= 0:
+		return 0.0
+	return float(step_move_count) / float(total_steps)
+
+func _reset_exe_skill_stats() -> void:
+	exe_skill_stats.clear()
+	for key: String in EXE_STAT_KEYS:
+		exe_skill_stats[key] = {
+			"synth": 0,
+			"cast": 0,
+			"kills": 0,
+			"recovery": 0,
+		}
+
+func _exe_skill_stat_key(stype: int) -> String:
+	match stype:
+		CharacterData.SkillType.SAME_AA:
+			return "pierce"
+		CharacterData.SkillType.SAME_MA:
+			return "ram"
+		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
+			return "spin"
+		CharacterData.SkillType.ORTHO_AA:
+			return "dual"
+		_:
+			return ""
+
+func _record_exe_skill_synthesis(slot_data: Array) -> void:
+	if not char_config.use_exe_manual_slotting or slot_data.size() != 3:
+		return
+	var key: String = _exe_skill_stat_key(_classify(slot_data))
+	if key.is_empty():
+		return
+	var stats: Dictionary = exe_skill_stats.get(key, {})
+	stats["synth"] = int(stats.get("synth", 0)) + 1
+	exe_skill_stats[key] = stats
+
+func _record_exe_skill_cast(slot_data: Array, kills: int, recovery: int) -> void:
+	if not char_config.use_exe_manual_slotting or slot_data.size() != 3:
+		return
+	var key: String = _exe_skill_stat_key(_classify(slot_data))
+	if key.is_empty():
+		return
+	var stats: Dictionary = exe_skill_stats.get(key, {})
+	stats["cast"] = int(stats.get("cast", 0)) + 1
+	stats["kills"] = int(stats.get("kills", 0)) + kills
+	stats["recovery"] = int(stats.get("recovery", 0)) + recovery
+	exe_skill_stats[key] = stats
+
+func _get_total_exe_skill_syntheses() -> int:
+	var total: int = 0
+	for key: String in EXE_STAT_KEYS:
+		var stats: Dictionary = exe_skill_stats.get(key, {})
+		total += int(stats.get("synth", 0))
+	return total
+
 func set_atk_highlight(slot: int) -> void:
 	attack_queue_highlighted = -1 if attack_queue_highlighted == slot else slot
 	queue_redraw()
@@ -350,6 +457,7 @@ func try_combine_skill() -> bool:
 	skill_slots[empty] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
 	attack_queue.remove_at(attack_queue_highlighted)
 	attack_queue_highlighted = -1
+	_record_slot_usage_sample()
 	_refresh_visuals()
 	return true
 
@@ -374,6 +482,7 @@ func _try_combine_skill_unified() -> bool:
 	if CharacterData.DIR_VECTOR[dir_seq] + CharacterData.DIR_VECTOR[dir_atk] == Vector2i.ZERO:
 		return false
 	skill_slots[slot_index] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
+	_record_slot_usage_sample()
 	_refresh_visuals()
 	return true
 
@@ -417,6 +526,7 @@ func _try_store_rdr_skill_vector() -> bool:
 		action_seq_used_for_space[used_index] = true
 	else:
 		return false
+	_record_slot_usage_sample()
 	_refresh_visuals()
 	return true
 
@@ -447,9 +557,11 @@ func _try_store_exe_skill_component() -> bool:
 	elif slot_data.size() == 1:
 		var dir_prev: int = slot_data[0]
 		skill_slots[slot_index] = [dir_seq, dir_prev, latest_is_attack]
+		_record_exe_skill_synthesis(skill_slots[slot_index])
 		action_seq_used_for_space[used_index] = true
 	else:
 		return false
+	_record_slot_usage_sample()
 	_refresh_visuals()
 	return true
 
@@ -496,6 +608,7 @@ func _resolve_exe_pending_attack_with_space() -> bool:
 		if CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] == Vector2i.ZERO:
 			return false
 		skill_slots[slot_index] = [dir_seq, dir_prev, true]
+		_record_exe_skill_synthesis(skill_slots[slot_index])
 		action_seq.remove_at(used_index)
 		action_seq_is_attack.remove_at(used_index)
 		action_seq_used_for_space.remove_at(used_index)
@@ -714,6 +827,8 @@ func _draw() -> void:
 
 	var rem_moves: int = char_config.max_moves + bonus_moves - moves_this_turn
 	var rem_atk: int = char_config.max_attacks + bonus_attacks - attacks_this_turn
+	var avg_slot_usage: float = _get_average_slot_usage()
+	var move_usage_ratio: float = _get_move_usage_ratio()
 	var skill_font_size: int = 26
 	var exe_slot_x0: float = 0.0
 	var exe_slot_y: float = base_ui_y
@@ -806,7 +921,6 @@ func _draw() -> void:
 					CharacterData.SKILL_TYPE_NAMES[stype2],
 					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
 
-	var cx: float
 	if char_config.use_exe_manual_slotting:
 		var temp_x: float = exe_slot_x0 - SEQ_STEP
 		var action_x: float = seq_x0
@@ -828,7 +942,6 @@ func _draw() -> void:
 			var move_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
 			draw_string(font, Vector2(action_x, move_y), CharacterData.DIR_ARROWS[action_seq[move_index]],
 				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color.WHITE)
-		cx = temp_x - 70.0
 	else:
 		for i: int in slots:
 			var x: float = seq_x0 + i * SEQ_STEP
@@ -843,14 +956,15 @@ func _draw() -> void:
 				var col: Color = Color(1.0, 0.6, 0.15) if action_seq_is_attack[i] else Color.WHITE
 				draw_string(font, Vector2(x, text_y), arrow,
 					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
-		cx = seq_x0 - 70.0
 
-	draw_string(font, Vector2(cx, seq_y + 28.0), str(rem_moves) + "M",
+	var bottom_stat_x: float = 8.0
+	var bottom_stat_y: float = seq_y + SEQ_SIZE + 30.0
+	draw_string(font, Vector2(bottom_stat_x, bottom_stat_y), str(rem_moves) + "M",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color.WHITE)
-	draw_string(font, Vector2(cx, seq_y + 58.0), str(rem_atk) + "A",
+	draw_string(font, Vector2(bottom_stat_x, bottom_stat_y + 30.0), str(rem_atk) + "A",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 22, Color(1.0, 0.6, 0.15))
 	if is_polluted(player_pos):
-		draw_string(font, Vector2(cx - 12.0, seq_y + 88.0), "NO BASIC ATK / NO COMBINE",
+		draw_string(font, Vector2(bottom_stat_x, bottom_stat_y + 60.0), "NO BASIC ATK / NO COMBINE",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(0.4, 0.9, 0.4))
 
 	var threat: Dictionary = score_pollution_threat()
@@ -871,6 +985,38 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
 	draw_string(font, Vector2(side_x, 266.0), str(threat["score"]),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.45, 0.9, 0.45))
+	draw_string(font, Vector2(side_x, 300.0), "AVG SLOT",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+	draw_string(font, Vector2(side_x, 340.0), "%.1f" % avg_slot_usage,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.95, 0.9, 0.55))
+	draw_string(font, Vector2(side_x, 374.0), "MOVE%",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+	draw_string(font, Vector2(side_x, 414.0), "%.0f%%" % (move_usage_ratio * 100.0),
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.85, 0.95, 1.0))
+	if char_config.use_exe_manual_slotting:
+		var total_synth: int = _get_total_exe_skill_syntheses()
+		draw_string(font, Vector2(side_x, 454.0), "EXE SKILL",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+		draw_string(font, Vector2(side_x, 478.0), "SKL S% K R%",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.7, 0.75))
+		for i: int in EXE_STAT_KEYS.size():
+			var key: String = EXE_STAT_KEYS[i]
+			var stats: Dictionary = exe_skill_stats.get(key, {})
+			var synth: int = int(stats.get("synth", 0))
+			var cast: int = int(stats.get("cast", 0))
+			var kills: int = int(stats.get("kills", 0))
+			var recovery: int = int(stats.get("recovery", 0))
+			var synth_pct: int = 0 if total_synth <= 0 else int(round(float(synth) * 100.0 / float(total_synth)))
+			var avg_kills: float = 0.0 if cast <= 0 else float(kills) / float(cast)
+			var recovery_pct: int = 0 if cast <= 0 else int(round(float(recovery) * 50.0 / float(cast)))
+			var row_text: String = "%s %2d %.1f %2d" % [
+				EXE_STAT_LABELS[key],
+				synth_pct,
+				avg_kills,
+				recovery_pct,
+			]
+			draw_string(font, Vector2(side_x, 500.0 + i * 18.0), row_text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.9, 0.9, 0.95))
 	if game_over:
 		draw_rect(Rect2(-14.0, -14.0, board_w + 160.0, ROWS * CELL_STEP + 30.0), Color(0, 0, 0, 0.35))
 		draw_string(font, Vector2(board_w * 0.15, ROWS * CELL_STEP * 0.48), "FAILED",
@@ -1046,6 +1192,7 @@ func use_skill(slot: int) -> void:
 		return
 	if slot < 0 or slot >= char_config.skill_slot_count or skill_slots[slot].size() != 3:
 		return
+	var cast_skill: Array = skill_slots[slot].duplicate()
 	var live_state: Dictionary = {
 		"grid": grid,
 		"polluted_grid": polluted_grid,
@@ -1055,6 +1202,7 @@ func use_skill(slot: int) -> void:
 		"enemy_pollution_dir": enemy_pollution_dir,
 		"kill_delta": 0,
 		"bonus_moves_delta": 0,
+		"recovered_dirs": [],
 		"player_moved": false,
 	}
 	_apply_skill_to_state(live_state, skill_slots[slot])
@@ -1068,7 +1216,11 @@ func use_skill(slot: int) -> void:
 	bonus_moves += int(live_state["bonus_moves_delta"])
 	if char_config.use_rdr_classifier:
 		bonus_attacks += 1
+	_record_exe_skill_cast(cast_skill, int(live_state["kill_delta"]), live_state["recovered_dirs"].size())
 	skill_slots[slot] = []
+	if char_config.use_exe_manual_slotting:
+		_apply_recovered_dirs_to_slots(live_state["recovered_dirs"])
+	_record_step_stats(false, true)
 	_refresh_visuals()
 
 func _board_state() -> Dictionary:
@@ -1081,6 +1233,7 @@ func _board_state() -> Dictionary:
 		"enemy_pollution_dir": enemy_pollution_dir.duplicate(true),
 		"kill_delta": 0,
 		"bonus_moves_delta": 0,
+		"recovered_dirs": [],
 		"player_moved": false,
 	}
 
@@ -1137,10 +1290,32 @@ func _state_hit_cell(state: Dictionary, p: Vector2i, attack_dir: int) -> void:
 			state["shield_spawn_turn"].erase(p)
 	else:
 		_state_clear_enemy(state, p)
+		_state_record_recovery_dir(state, attack_dir)
 		if char_config.teleport_on_kill:
 			state["player_pos"] = p
 			state["player_moved"] = true
 			state["bonus_moves_delta"] += 1
+
+func _state_record_recovery_dir(state: Dictionary, attack_dir: int) -> void:
+	if not char_config.use_exe_manual_slotting:
+		return
+	if attack_dir == CharacterData.Direction.NONE:
+		return
+	if not state.has("recovered_dirs"):
+		state["recovered_dirs"] = []
+	var recovered_dirs: Array = state["recovered_dirs"]
+	if recovered_dirs.size() >= 2:
+		return
+	if recovered_dirs.has(attack_dir):
+		return
+	recovered_dirs.append(attack_dir)
+
+func _apply_recovered_dirs_to_slots(recovered_dirs: Array) -> void:
+	for dir_id: int in recovered_dirs:
+		var empty_slot: int = _first_empty_skill_slot()
+		if empty_slot < 0:
+			return
+		skill_slots[empty_slot] = [dir_id]
 
 func _apply_skill_to_state(state: Dictionary, slot_data: Array) -> void:
 	var stype: int = _classify(slot_data)
@@ -1204,6 +1379,7 @@ func _skill_changes_state(state: Dictionary, skill: Array) -> bool:
 		"enemy_pollution_dir": state["enemy_pollution_dir"].duplicate(true),
 		"kill_delta": 0,
 		"bonus_moves_delta": 0,
+		"recovered_dirs": [],
 		"player_moved": false,
 	}
 	_apply_skill_to_state(sim, skill)
