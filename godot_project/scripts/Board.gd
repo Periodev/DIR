@@ -23,7 +23,7 @@ const EXE_STAT_LABELS: Dictionary = {
 signal board_updated
 
 enum SpawnMode { SEEDED, TRUE_RANDOM }
-enum PlayMode { NORMAL, GUARD }
+enum PlayMode { NORMAL, GUARD, SURVIVAL }
 enum GuardQuadrant { TL, TR, BL, BR }
 
 var char_config: CharacterData.Config = null
@@ -64,6 +64,8 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _next_spawn_preview: Array = []
 var _spawn_mode: int = SpawnMode.SEEDED
 var _play_mode: int = PlayMode.NORMAL
+var _board_cols: int = COLS
+var _board_rows: int = ROWS
 var _debug_skill_slot_override: int = -1
 var _guard_quadrant_counts: Array = [0, 0, 0, 0]
 var _guard_active_quadrant: int = -1
@@ -85,20 +87,21 @@ class ArrowOverlay extends Node2D:
 		var head_arm: float = 18.0
 		var line_w: float = 3.5
 		var color: Color = Color(1.0, 0.6, 0.15, 0.95)
-		var cols_: int = board.COLS
-		var rows_: int = board.ROWS
+		var cols_: int = board.get_board_cols()
+		var rows_: int = board.get_board_rows()
 		var cell_size_: float = board.CELL_SIZE
 		var cell_gap_: float = board.CELL_GAP
 		var cell_step_: float = board.CELL_STEP
 
-		if board.is_guard_mode():
-			var center: Vector2i = Vector2i(cols_ / 2, rows_ / 2)
-			draw_rect(
-				Rect2(center.x * cell_step_ + 5.0, center.y * cell_step_ + 5.0, cell_size_ - 10.0, cell_size_ - 10.0),
-				Color(0.45, 0.95, 1.0, 0.95),
-				false,
-				4.0
-			)
+		if board.is_control_mode():
+			if board.is_guard_mode():
+				var center: Vector2i = Vector2i(cols_ / 2, rows_ / 2)
+				draw_rect(
+					Rect2(center.x * cell_step_ + 5.0, center.y * cell_step_ + 5.0, cell_size_ - 10.0, cell_size_ - 10.0),
+					Color(0.45, 0.95, 1.0, 0.95),
+					false,
+					4.0
+				)
 			var active_quadrant: int = board.get_guard_active_quadrant()
 			var preview_quadrant: int = board.get_guard_preview_quadrant()
 			if preview_quadrant >= 0:
@@ -216,19 +219,46 @@ func toggle_debug_skill_slots() -> void:
 	restart()
 
 func toggle_play_mode() -> void:
-	_play_mode = PlayMode.GUARD if _play_mode == PlayMode.NORMAL else PlayMode.NORMAL
+	match _play_mode:
+		PlayMode.NORMAL:
+			_play_mode = PlayMode.GUARD
+		PlayMode.GUARD:
+			_play_mode = PlayMode.SURVIVAL
+		_:
+			_play_mode = PlayMode.NORMAL
 	restart()
 
 func is_guard_mode() -> bool:
 	return _play_mode == PlayMode.GUARD
 
+func is_survival_mode() -> bool:
+	return _play_mode == PlayMode.SURVIVAL
+
+func is_control_mode() -> bool:
+	return _play_mode == PlayMode.GUARD or _play_mode == PlayMode.SURVIVAL
+
+func get_board_cols() -> int:
+	return _board_cols
+
+func get_board_rows() -> int:
+	return _board_rows
+
+func get_play_mode_label() -> String:
+	match _play_mode:
+		PlayMode.GUARD:
+			return "GUARD"
+		PlayMode.SURVIVAL:
+			return "SURVIVE"
+		_:
+			return "NORMAL"
+
 func get_guard_preview_quadrant() -> int:
-	if _play_mode != PlayMode.GUARD or _next_spawn_preview.is_empty():
+	if not is_control_mode() or _next_spawn_preview.is_empty():
 		return -1
 	return int(_next_spawn_preview[0].get("quadrant", -1))
 
 func get_guard_active_quadrant() -> int:
-	return _guard_active_quadrant if _play_mode == PlayMode.GUARD else -1
+	return _guard_active_quadrant if is_control_mode() else -1
 
 func get_guard_quadrant_rect(quadrant: int) -> Rect2i:
 	return _guard_quadrant_rect(quadrant)
@@ -264,17 +294,20 @@ func _ready() -> void:
 func restart() -> void:
 	_load_char_config()
 	_rng.randomize()
+	_board_cols = 4 if _play_mode == PlayMode.SURVIVAL else COLS
+	_board_rows = 4 if _play_mode == PlayMode.SURVIVAL else ROWS
+	_update_board_offset()
 	grid.clear()
 	polluted_grid.clear()
-	for _r: int in ROWS:
+	for _r: int in _board_rows:
 		var row: Array[int] = []
 		var polluted_row: Array[bool] = []
-		for _c: int in COLS:
+		for _c: int in _board_cols:
 			row.append(CharacterData.CellType.LIVE)
 			polluted_row.append(false)
 		grid.append(row)
 		polluted_grid.append(polluted_row)
-	player_pos = Vector2i(COLS / 2, ROWS / 2)
+	player_pos = Vector2i(_board_cols / 2, _board_rows / 2)
 	action_seq.clear()
 	action_seq_is_attack.clear()
 	action_seq_used_for_space.clear()
@@ -305,7 +338,7 @@ func restart() -> void:
 	game_over = false
 	game_over_reason = ""
 	_next_spawn_preview.clear()
-	if _play_mode == PlayMode.GUARD:
+	if is_control_mode():
 		_compute_next_guard_preview()
 	_refresh_visuals()
 
@@ -425,7 +458,7 @@ func try_end_turn() -> bool:
 	bonus_moves = 0
 	bonus_attacks = 0
 	_harden_old_shields()
-	if _play_mode == PlayMode.GUARD:
+	if is_control_mode():
 		_spread_guard_pollution()
 		_spawn_guard_controls()
 		_compute_next_guard_preview()
@@ -821,8 +854,8 @@ func _try_combine_skill_mixed() -> bool:
 
 func _spawn_order(seed: int) -> Array[Vector2i]:
 	var all: Array[Vector2i] = []
-	for r: int in ROWS:
-		for c: int in COLS:
+	for r: int in _board_rows:
+		for c: int in _board_cols:
 			all.append(Vector2i(c, r))
 	if _spawn_mode == SpawnMode.SEEDED:
 		_rng.seed = seed
@@ -849,7 +882,7 @@ func _build_spawn_preview(count: int, seed: int) -> Array:
 	return result
 
 func debug_spawn_enemies(count: int) -> void:
-	if _play_mode == PlayMode.GUARD:
+	if is_control_mode():
 		if _next_spawn_preview.is_empty():
 			_compute_next_guard_preview()
 		_spawn_guard_controls()
@@ -875,26 +908,27 @@ func _guard_quadrant_origin(quadrant: int) -> Vector2i:
 		GuardQuadrant.TL:
 			return Vector2i(0, 0)
 		GuardQuadrant.TR:
-			return Vector2i(COLS - 1, 0)
+			return Vector2i(_board_cols - 1, 0)
 		GuardQuadrant.BL:
-			return Vector2i(0, ROWS - 1)
+			return Vector2i(0, _board_rows - 1)
 		GuardQuadrant.BR:
-			return Vector2i(COLS - 1, ROWS - 1)
+			return Vector2i(_board_cols - 1, _board_rows - 1)
 		_:
 			return Vector2i.ZERO
 
 func _guard_quadrant_rect(quadrant: int) -> Rect2i:
+	var size: int = 3 if _play_mode == PlayMode.SURVIVAL else 4
 	match quadrant:
 		GuardQuadrant.TL:
-			return Rect2i(0, 0, 4, 4)
+			return Rect2i(0, 0, size, size)
 		GuardQuadrant.TR:
-			return Rect2i(1, 0, 4, 4)
+			return Rect2i(_board_cols - size, 0, size, size)
 		GuardQuadrant.BL:
-			return Rect2i(0, 1, 4, 4)
+			return Rect2i(0, _board_rows - size, size, size)
 		GuardQuadrant.BR:
-			return Rect2i(1, 1, 4, 4)
+			return Rect2i(_board_cols - size, _board_rows - size, size, size)
 		_:
-			return Rect2i(0, 0, COLS, ROWS)
+			return Rect2i(0, 0, _board_cols, _board_rows)
 
 func _choose_guard_quadrant() -> int:
 	var candidates: Array = []
@@ -915,13 +949,13 @@ func _choose_guard_quadrant() -> int:
 func _compute_next_guard_preview() -> void:
 	var quadrant: int = _choose_guard_quadrant()
 	_guard_quadrant_counts[quadrant] += 1
-	_next_spawn_preview = _build_guard_spawn_preview(quadrant, 3)
+	_next_spawn_preview = _build_guard_spawn_preview(quadrant, 5)
 
 func _build_guard_spawn_preview(quadrant: int, count: int) -> Array:
 	var result: Array = []
 	var cells: Array = []
-	for y: int in ROWS:
-		for x: int in COLS:
+	for y: int in _board_rows:
+		for x: int in _board_cols:
 			cells.append(Vector2i(x, y))
 	for i: int in range(cells.size() - 1, 0, -1):
 		var j: int = _rng.randi_range(0, i)
@@ -975,8 +1009,8 @@ func _grow_guard_pollution(quadrant: int) -> void:
 	var origin: Vector2i = _guard_quadrant_origin(quadrant)
 	var best_depth: int = 999
 	var candidates: Array = []
-	for y: int in ROWS:
-		for x: int in COLS:
+	for y: int in _board_rows:
+		for x: int in _board_cols:
 			if polluted_grid[y][x]:
 				continue
 			var pos: Vector2i = Vector2i(x, y)
@@ -994,6 +1028,10 @@ func _grow_guard_pollution(quadrant: int) -> void:
 func _refresh_visuals() -> void:
 	for r: int in ROWS:
 		for c: int in COLS:
+			if r >= _board_rows or c >= _board_cols:
+				cell_nodes[r][c].visible = false
+				continue
+			cell_nodes[r][c].visible = true
 			var pos: Vector2i = Vector2i(c, r)
 			cell_nodes[r][c].set_type(grid[r][c])
 			cell_nodes[r][c].set_polluted(polluted_grid[r][c])
@@ -1038,10 +1076,10 @@ func _draw() -> void:
 	var font: Font = ThemeDB.fallback_font
 	var font_size: int = 32
 	var slots: int = char_config.seq_slots
-	var board_w: float = (COLS - 1) * CELL_STEP + CELL_SIZE
+	var board_w: float = (_board_cols - 1) * CELL_STEP + CELL_SIZE
 	var total_seq_w: float = (slots - 1) * SEQ_STEP + SEQ_SIZE
 	var seq_x0: float = (board_w - total_seq_w) / 2.0
-	var base_ui_y: float = ROWS * CELL_STEP + SEQ_MARGIN_TOP
+	var base_ui_y: float = _board_rows * CELL_STEP + SEQ_MARGIN_TOP
 	var seq_y: float
 
 	var rem_moves: int = char_config.max_moves + bonus_moves - moves_this_turn
@@ -1198,7 +1236,7 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 0.95))
 	draw_string(font, Vector2(side_x, 146.0), "MODE",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 170.0), "GUARD" if _play_mode == PlayMode.GUARD else "NORMAL",
+	draw_string(font, Vector2(side_x, 170.0), get_play_mode_label(),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 0.95))
 	draw_string(font, Vector2(side_x, 204.0), "KILL",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
@@ -1241,19 +1279,19 @@ func _draw() -> void:
 			draw_string(font, Vector2(side_x, 552.0 + i * 18.0), row_text,
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.9, 0.9, 0.95))
 	if game_over:
-		draw_rect(Rect2(-14.0, -14.0, board_w + 160.0, ROWS * CELL_STEP + 30.0), Color(0, 0, 0, 0.35))
-		draw_string(font, Vector2(board_w * 0.15, ROWS * CELL_STEP * 0.48), "FAILED",
+		draw_rect(Rect2(-14.0, -14.0, board_w + 160.0, _board_rows * CELL_STEP + 30.0), Color(0, 0, 0, 0.35))
+		draw_string(font, Vector2(board_w * 0.15, _board_rows * CELL_STEP * 0.48), "FAILED",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 56, Color(1.0, 0.4, 0.4))
-		draw_string(font, Vector2(board_w * 0.15, ROWS * CELL_STEP * 0.48 + 34.0), game_over_reason,
+		draw_string(font, Vector2(board_w * 0.15, _board_rows * CELL_STEP * 0.48 + 34.0), game_over_reason,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.95, 0.95, 0.95))
 
 func _update_board_offset() -> void:
-	var board_w: float = (COLS - 1) * CELL_STEP + CELL_SIZE
+	var board_w: float = (_board_cols - 1) * CELL_STEP + CELL_SIZE
 	var total_h: float
 	if char_config != null and char_config.use_unified_slots:
-		total_h = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE
+		total_h = _board_rows * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE
 	else:
-		total_h = ROWS * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE + SKILL_MARGIN_TOP + SEQ_SIZE
+		total_h = _board_rows * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE + SKILL_MARGIN_TOP + SEQ_SIZE
 	var vp: Vector2 = get_viewport_rect().size
 	position = Vector2((vp.x - board_w) / 2.0, (vp.y - total_h) / 2.0)
 
@@ -1263,7 +1301,7 @@ func _classify(slot_data: Array) -> int:
 	return CharacterData.classify_skill(slot_data)
 
 func _in_bounds(p: Vector2i) -> bool:
-	return p.x >= 0 and p.x < COLS and p.y >= 0 and p.y < ROWS
+	return p.x >= 0 and p.x < _board_cols and p.y >= 0 and p.y < _board_rows
 
 func _has_adjacent_enemy(p: Vector2i) -> bool:
 	for dv: Vector2i in CharacterData.DIR_VECTOR.values():
@@ -1480,7 +1518,7 @@ func _duplicate_bool_grid(source: Array) -> Array:
 	return copy
 
 func _state_in_bounds(p: Vector2i, state: Dictionary) -> bool:
-	return p.x >= 0 and p.x < COLS and p.y >= 0 and p.y < ROWS
+	return p.x >= 0 and p.x < _board_cols and p.y >= 0 and p.y < _board_rows
 
 func _state_cell_is_enemy(state: Dictionary, p: Vector2i) -> bool:
 	return _state_in_bounds(p, state) and CharacterData.is_enemy(state["grid"][p.y][p.x])
@@ -1665,10 +1703,16 @@ func _has_combinable_material() -> bool:
 
 func check_loss_state() -> bool:
 	if _play_mode == PlayMode.GUARD:
-		var center: Vector2i = Vector2i(COLS / 2, ROWS / 2)
+		var center: Vector2i = Vector2i(_board_cols / 2, _board_rows / 2)
 		if is_polluted(center):
 			game_over = true
 			game_over_reason = "Guard point polluted."
+			return true
+		return false
+	if _play_mode == PlayMode.SURVIVAL:
+		if _is_board_fully_polluted():
+			game_over = true
+			game_over_reason = "Board fully polluted."
 			return true
 		return false
 	if not is_polluted(player_pos):
@@ -1681,10 +1725,17 @@ func check_loss_state() -> bool:
 	game_over_reason = "Contaminated, boxed in, no live skill."
 	return true
 
+func _is_board_fully_polluted() -> bool:
+	for y: int in _board_rows:
+		for x: int in _board_cols:
+			if not polluted_grid[y][x]:
+				return false
+	return true
+
 func _count_central_pollution() -> int:
 	var total: int = 0
-	for y: int in range(1, 4):
-		for x: int in range(1, 4):
+	for y: int in range(1, _board_rows - 1):
+		for x: int in range(1, _board_cols - 1):
 			if polluted_grid[y][x]:
 				total += 1
 	return total
@@ -1700,8 +1751,8 @@ func _count_polluted_tiles() -> int:
 func _largest_pollution_cluster() -> int:
 	var visited: Dictionary = {}
 	var best: int = 0
-	for y: int in ROWS:
-		for x: int in COLS:
+	for y: int in _board_rows:
+		for x: int in _board_cols:
 			var start: Vector2i = Vector2i(x, y)
 			if not is_polluted(start) or visited.has(start):
 				continue
@@ -1721,8 +1772,8 @@ func _largest_pollution_cluster() -> int:
 
 func _count_polluted_chokepoints() -> int:
 	var chokepoints: int = 0
-	for y: int in ROWS:
-		for x: int in COLS:
+	for y: int in _board_rows:
+		for x: int in _board_cols:
 			var p: Vector2i = Vector2i(x, y)
 			if not is_polluted(p):
 				continue
