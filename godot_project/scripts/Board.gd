@@ -36,6 +36,7 @@ var action_seq: Array[int] = []
 var action_seq_is_attack: Array[bool] = []
 var action_seq_used_for_space: Array[bool] = []
 var exe_pending_attack_slot: int = -1
+var rdr_pending_vector: int = CharacterData.Direction.NONE
 var moves_this_turn: int = 0
 var attacks_this_turn: int = 0
 var bonus_moves: int = 0
@@ -51,6 +52,7 @@ var attack_queue: Array[int] = []
 var attack_queue_highlighted: int = -1
 
 var skill_slots: Array = []
+var skill_slot_sources: Array = []
 var skill_preview: int = -1
 var kill_count: int = 0
 var shield_spawn_turn: Dictionary = {}
@@ -69,6 +71,7 @@ var _board_rows: int = ROWS
 var _debug_skill_slot_override: int = -1
 var _guard_quadrant_counts: Array = [0, 0, 0, 0]
 var _guard_active_quadrant: int = -1
+var rdr_pending_is_attack: bool = false
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 const _RDR_SCRIPT = preload("res://scripts/CharacterImpl_RDR.gd")
@@ -312,6 +315,8 @@ func restart() -> void:
 	action_seq_is_attack.clear()
 	action_seq_used_for_space.clear()
 	exe_pending_attack_slot = -1
+	rdr_pending_vector = CharacterData.Direction.NONE
+	rdr_pending_is_attack = false
 	moves_this_turn = 0
 	attacks_this_turn = 0
 	bonus_moves = 0
@@ -325,8 +330,10 @@ func restart() -> void:
 	attack_queue.clear()
 	attack_queue_highlighted = -1
 	skill_slots.resize(char_config.skill_slot_count)
+	skill_slot_sources.resize(char_config.skill_slot_count)
 	for i: int in char_config.skill_slot_count:
 		skill_slots[i] = []
+		skill_slot_sources[i] = []
 	skill_preview = -1
 	kill_count = 0
 	shield_spawn_turn.clear()
@@ -363,6 +370,8 @@ func try_move(dir: int) -> bool:
 		return false
 	if not _resolve_exe_pending_attack_default():
 		return false
+	if not _resolve_rdr_pending_default():
+		return false
 	if not char_config.use_exe_manual_slotting and action_seq.size() >= char_config.seq_slots:
 		return false
 	if moves_this_turn >= char_config.max_moves + bonus_moves:
@@ -370,7 +379,10 @@ func try_move(dir: int) -> bool:
 	if not is_basic_move_legal(player_pos, dir):
 		return false
 	player_pos += CharacterData.DIR_VECTOR[dir]
-	_append_action_step(dir, false)
+	if char_config.use_rdr_classifier:
+		_record_rdr_vector(dir, false)
+	else:
+		_append_action_step(dir, false)
 	moves_this_turn += 1
 	_record_step_stats(true, false)
 	_refresh_visuals()
@@ -380,6 +392,8 @@ func try_attack(dir: int) -> bool:
 	if game_over:
 		return false
 	if not _resolve_exe_pending_attack_default():
+		return false
+	if not _resolve_rdr_pending_default():
 		return false
 	if is_polluted(player_pos):
 		return false
@@ -405,6 +419,8 @@ func try_attack(dir: int) -> bool:
 	var killed: bool = grid[target.y][target.x] == CharacterData.CellType.LIVE
 	if char_config.use_exe_manual_slotting and killed:
 		_record_exe_attack_vector(dir)
+	elif char_config.use_rdr_classifier and killed:
+		_record_rdr_vector(dir, true)
 	elif not char_config.use_rdr_classifier or killed:
 		_append_action_step(dir, true)
 	attacks_this_turn += 1
@@ -416,6 +432,8 @@ func try_end_turn() -> bool:
 	if game_over:
 		return false
 	if not _resolve_exe_pending_attack_default():
+		return false
+	if not _resolve_rdr_pending_default():
 		return false
 	if char_config.use_unified_slots and not char_config.use_rdr_classifier and not char_config.use_exe_manual_slotting:
 		var new_attacks: Array[int] = []
@@ -611,16 +629,13 @@ func _try_combine_skill_unified() -> bool:
 	return true
 
 func _try_store_rdr_skill_vector() -> bool:
-	if action_seq.is_empty():
-		return false
-	var used_index: int = action_seq.size() - 1
-	if used_index < 0 or used_index >= action_seq_used_for_space.size() or action_seq_used_for_space[used_index]:
+	if rdr_pending_vector == CharacterData.Direction.NONE:
 		return false
 	var slot_index: int = skill_preview
-	var slot_data: Array = []
 	if slot_index >= 0 and slot_index < char_config.skill_slot_count:
-		slot_data = skill_slots[slot_index]
-	if slot_index < 0 or slot_index >= char_config.skill_slot_count or slot_data.size() >= 3:
+		if not _can_store_rdr_vector_in_slot(skill_slots[slot_index], rdr_pending_vector):
+			return false
+	else:
 		slot_index = -1
 		for i: int in char_config.skill_slot_count:
 			if skill_slots[i].is_empty():
@@ -628,31 +643,76 @@ func _try_store_rdr_skill_vector() -> bool:
 				break
 		if slot_index < 0:
 			for i: int in char_config.skill_slot_count:
-				if skill_slots[i].size() == 1:
+				if _can_store_rdr_vector_in_slot(skill_slots[i], rdr_pending_vector):
 					slot_index = i
 					break
 	if slot_index < 0:
 		return false
-	slot_data = skill_slots[slot_index]
-	if slot_data.size() >= 3:
-		return false
-	var dir_seq: int = action_seq[-1]
-	if slot_data.is_empty():
-		skill_slots[slot_index] = [dir_seq]
-		action_seq.remove_at(used_index)
-		action_seq_is_attack.remove_at(used_index)
-		action_seq_used_for_space.remove_at(used_index)
-	elif slot_data.size() == 1:
-		var dir_prev: int = slot_data[0]
-		if CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] == Vector2i.ZERO:
-			return false
-		skill_slots[slot_index] = [dir_prev, dir_seq, false]
-		action_seq_used_for_space[used_index] = true
-	else:
-		return false
+	_store_rdr_vector_in_slot(slot_index, rdr_pending_vector, rdr_pending_is_attack)
+	rdr_pending_vector = CharacterData.Direction.NONE
+	rdr_pending_is_attack = false
 	_record_slot_usage_sample()
 	_refresh_visuals()
 	return true
+
+func _record_rdr_vector(dir_seq: int, is_attack: bool) -> void:
+	if not _has_rdr_partial_slot():
+		var empty_slot: int = _first_empty_skill_slot()
+		if empty_slot >= 0:
+			skill_slots[empty_slot] = [dir_seq]
+			skill_slot_sources[empty_slot] = [is_attack]
+			_record_slot_usage_sample()
+			return
+	rdr_pending_vector = dir_seq
+	rdr_pending_is_attack = is_attack
+
+func _resolve_rdr_pending_default() -> bool:
+	if not char_config.use_rdr_classifier:
+		return true
+	if rdr_pending_vector == CharacterData.Direction.NONE:
+		return true
+	var empty_slot: int = _first_empty_skill_slot()
+	if empty_slot >= 0:
+		skill_slots[empty_slot] = [rdr_pending_vector]
+		skill_slot_sources[empty_slot] = [rdr_pending_is_attack]
+		rdr_pending_vector = CharacterData.Direction.NONE
+		rdr_pending_is_attack = false
+		_record_slot_usage_sample()
+		return true
+	for i: int in char_config.skill_slot_count:
+		if _can_store_rdr_vector_in_slot(skill_slots[i], rdr_pending_vector):
+			_store_rdr_vector_in_slot(i, rdr_pending_vector, rdr_pending_is_attack)
+			rdr_pending_vector = CharacterData.Direction.NONE
+			rdr_pending_is_attack = false
+			_record_slot_usage_sample()
+			return true
+	return false
+
+func _has_rdr_partial_slot() -> bool:
+	for slot_data: Array in skill_slots:
+		if slot_data.size() == 1:
+			return true
+	return false
+
+func _can_store_rdr_vector_in_slot(slot_data: Array, dir_seq: int) -> bool:
+	if slot_data.is_empty():
+		return true
+	if slot_data.size() != 1:
+		return false
+	var dir_prev: int = slot_data[0]
+	return CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] != Vector2i.ZERO
+
+func _store_rdr_vector_in_slot(slot_index: int, dir_seq: int, is_attack: bool) -> void:
+	var slot_data: Array = skill_slots[slot_index]
+	if slot_data.is_empty():
+		skill_slots[slot_index] = [dir_seq]
+		skill_slot_sources[slot_index] = [is_attack]
+	elif slot_data.size() == 1:
+		var dir_prev: int = slot_data[0]
+		skill_slots[slot_index] = [dir_prev, dir_seq, false]
+		var sources: Array = skill_slot_sources[slot_index]
+		var prev_is_attack: bool = sources[0] if sources.size() > 0 else false
+		skill_slot_sources[slot_index] = [prev_is_attack, is_attack]
 
 func _try_store_exe_skill_component() -> bool:
 	if exe_pending_attack_slot >= 0:
@@ -1093,7 +1153,7 @@ func _draw() -> void:
 		var slot_count: int = char_config.skill_slot_count
 		var total_slot_w: float = (slot_count - 1) * SEQ_STEP + SEQ_SIZE
 		var slot_x0: float = (board_w - total_slot_w) / 2.0
-		if char_config.use_exe_manual_slotting:
+		if char_config.use_exe_manual_slotting or char_config.use_rdr_classifier:
 			slot_x0 += 24.0
 		var slot_y: float = base_ui_y
 		exe_slot_x0 = slot_x0
@@ -1112,10 +1172,15 @@ func _draw() -> void:
 				var stext_y: float = slot_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0 - 8.0
 				var half: float = SEQ_SIZE / 2.0
 				var col_a: Color = Color(1.0, 0.6, 0.15) if slot_data[2] else Color.WHITE
+				var col_b: Color = Color(1.0, 0.6, 0.15)
+				if char_config.use_rdr_classifier and i < skill_slot_sources.size():
+					var slot_sources: Array = skill_slot_sources[i]
+					col_a = Color(1.0, 0.6, 0.15) if slot_sources.size() > 0 and slot_sources[0] else Color.WHITE
+					col_b = Color(1.0, 0.6, 0.15) if slot_sources.size() > 1 and slot_sources[1] else Color.WHITE
 				draw_string(font, Vector2(sx, stext_y), CharacterData.DIR_ARROWS[slot_data[0]],
 					HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_a)
 				draw_string(font, Vector2(sx + half, stext_y), CharacterData.DIR_ARROWS[slot_data[1]],
-					HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, Color(1.0, 0.6, 0.15))
+					HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_b)
 				var stype: int = _classify(slot_data)
 				draw_string(font, Vector2(sx, slot_y + SEQ_SIZE - 2.0),
 					CharacterData.SKILL_TYPE_NAMES[stype],
@@ -1125,8 +1190,12 @@ func _draw() -> void:
 				draw_rect(srect, Color(1.0, 0.6, 0.15) if is_armed else Color(0.40, 0.25, 0.08),
 					false, 2.5 if is_armed else 1.5)
 				var atk_text_y: float = slot_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+				var single_col: Color = Color(1.0, 0.6, 0.15)
+				if char_config.use_rdr_classifier and i < skill_slot_sources.size():
+					var single_sources: Array = skill_slot_sources[i]
+					single_col = Color(1.0, 0.6, 0.15) if single_sources.size() > 0 and single_sources[0] else Color.WHITE
 				draw_string(font, Vector2(sx, atk_text_y), CharacterData.DIR_ARROWS[slot_data[0]],
-					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
+					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, single_col)
 			elif is_exe_pending_slot and not action_seq.is_empty():
 				draw_rect(srect, Color(0.10, 0.10, 0.13))
 				_draw_dashed_rect_outline(srect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
@@ -1199,6 +1268,17 @@ func _draw() -> void:
 			var move_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
 			draw_string(font, Vector2(action_x, move_y), CharacterData.DIR_ARROWS[action_seq[move_index]],
 				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color.WHITE)
+	elif char_config.use_rdr_classifier:
+		var rdr_temp_x: float = exe_slot_x0 - SEQ_STEP
+		var rdr_temp_size: float = SEQ_SIZE + 10.0
+		var rdr_temp_rect: Rect2 = Rect2(rdr_temp_x - 5.0, exe_slot_y - 5.0, rdr_temp_size, rdr_temp_size)
+		draw_rect(rdr_temp_rect, Color(0.10, 0.10, 0.13))
+		_draw_dashed_rect_outline(rdr_temp_rect, Color(0.65, 0.65, 1.0, 0.75), 2.0, 10.0, 6.0)
+		if rdr_pending_vector != CharacterData.Direction.NONE:
+			var rdr_temp_y: float = rdr_temp_rect.position.y + (rdr_temp_rect.size.y + font_size * 0.7) / 2.0
+			var rdr_pending_col: Color = Color(1.0, 0.72, 0.4, 0.65) if rdr_pending_is_attack else Color(1.0, 1.0, 1.0, 0.65)
+			draw_string(font, Vector2(rdr_temp_rect.position.x, rdr_temp_y), CharacterData.DIR_ARROWS[rdr_pending_vector],
+				HORIZONTAL_ALIGNMENT_CENTER, rdr_temp_rect.size.x, font_size, rdr_pending_col)
 	else:
 		for i: int in slots:
 			var x: float = seq_x0 + i * SEQ_STEP
@@ -1485,6 +1565,8 @@ func use_skill(slot: int) -> void:
 		bonus_attacks += 1
 	_record_exe_skill_cast(cast_skill, int(live_state["kill_delta"]), live_state["recovered_dirs"].size())
 	skill_slots[slot] = []
+	if slot < skill_slot_sources.size():
+		skill_slot_sources[slot] = []
 	if char_config.use_exe_manual_slotting:
 		_apply_recovered_dirs_to_slots(live_state["recovered_dirs"])
 	_record_step_stats(false, true)
@@ -1673,15 +1755,12 @@ func _count_effective_skills() -> int:
 	return effective
 
 func _has_combinable_material() -> bool:
-	if action_seq.is_empty():
-		return false
 	if char_config.use_unified_slots:
 		if char_config.use_rdr_classifier:
-			for slot_data: Array in skill_slots:
-				if slot_data.size() < 3:
-					return true
-			return false
+			return rdr_pending_vector != CharacterData.Direction.NONE
 		if char_config.use_exe_manual_slotting:
+			if action_seq.is_empty():
+				return false
 			if exe_pending_attack_slot >= 0:
 				return true
 			var used_index: int = action_seq.size() - 1
@@ -1696,6 +1775,8 @@ func _has_combinable_material() -> bool:
 		for slot_data: Array in skill_slots:
 			if slot_data.size() == 1:
 				return true
+		return false
+	if action_seq.is_empty():
 		return false
 	if char_config.skill_mixed:
 		return action_seq.size() >= 2
