@@ -356,7 +356,7 @@ func can_accept_input() -> bool:
 	return not game_over
 
 func can_combine_skill() -> bool:
-	return not is_polluted(player_pos)
+	return true
 
 func is_basic_move_legal(from: Vector2i, dir: int, state: Dictionary = {}) -> bool:
 	var target: Vector2i = from + CharacterData.DIR_VECTOR[dir]
@@ -433,8 +433,7 @@ func try_end_turn() -> bool:
 		return false
 	if not _resolve_exe_pending_attack_default():
 		return false
-	if not _resolve_rdr_pending_default():
-		return false
+	_clear_rdr_pending_vector()
 	if char_config.use_unified_slots and not char_config.use_rdr_classifier and not char_config.use_exe_manual_slotting:
 		var new_attacks: Array[int] = []
 		for i: int in action_seq.size():
@@ -687,6 +686,10 @@ func _resolve_rdr_pending_default() -> bool:
 			_record_slot_usage_sample()
 			return true
 	return false
+
+func _clear_rdr_pending_vector() -> void:
+	rdr_pending_vector = CharacterData.Direction.NONE
+	rdr_pending_is_attack = false
 
 func _has_rdr_partial_slot() -> bool:
 	for slot_data: Array in skill_slots:
@@ -1479,13 +1482,31 @@ func get_skill_preview_cells(slot: int) -> Dictionary:
 			if _in_bounds(pos + dv_atk):
 				result["hit"].append(pos + dv_atk)
 		CharacterData.SkillType.RDR_DASH:
+			var dash_mid: Vector2i = pos + dv_seq
 			var dash_target: Vector2i = pos + 2 * dv_seq
 			result["move"].append(dash_target)
-			result["hit"].append(dash_target)
+			var dash_sources: Array = _get_skill_slot_sources(slot)
+			if _rdr_sources_both_attack(dash_sources):
+				if _in_bounds(dash_mid):
+					result["hit"].append(dash_mid)
+				if _in_bounds(dash_target):
+					result["hit"].append(dash_target)
+			elif _rdr_landing_attack_dir(slot_data, dash_sources) != CharacterData.Direction.NONE:
+				result["hit"].append(dash_target)
 		CharacterData.SkillType.RDR_DIAG:
-			var diag_target: Vector2i = pos + dv_seq + dv_atk
-			result["move"].append(diag_target)
-			result["hit"].append(diag_target)
+			var diag_sources: Array = _get_skill_slot_sources(slot)
+			if _rdr_sources_both_attack(diag_sources):
+				if _in_bounds(pos + dv_seq):
+					result["hit"].append(pos + dv_seq)
+				if _in_bounds(pos + dv_atk):
+					result["hit"].append(pos + dv_atk)
+				if _in_bounds(pos + dv_seq + dv_atk):
+					result["hit"].append(pos + dv_seq + dv_atk)
+			else:
+				var diag_target: Vector2i = pos + dv_seq + dv_atk
+				result["move"].append(diag_target)
+				if _rdr_landing_attack_dir(slot_data, diag_sources) != CharacterData.Direction.NONE:
+					result["hit"].append(diag_target)
 	return result
 
 func set_skill_preview(slot: int) -> void:
@@ -1538,6 +1559,7 @@ func use_skill(slot: int) -> void:
 	if slot < 0 or slot >= char_config.skill_slot_count or skill_slots[slot].size() != 3:
 		return
 	var cast_skill: Array = skill_slots[slot].duplicate()
+	var cast_sources: Array = _get_skill_slot_sources(slot).duplicate()
 	var live_state: Dictionary = {
 		"grid": grid,
 		"polluted_grid": polluted_grid,
@@ -1551,7 +1573,7 @@ func use_skill(slot: int) -> void:
 		"recovered_dirs": [],
 		"player_moved": false,
 	}
-	_apply_skill_to_state(live_state, skill_slots[slot])
+	_apply_skill_to_state(live_state, skill_slots[slot], cast_sources)
 	grid = live_state["grid"]
 	polluted_grid = live_state["polluted_grid"]
 	player_pos = live_state["player_pos"]
@@ -1632,7 +1654,7 @@ func _state_move_enemy_data(state: Dictionary, from: Vector2i, to: Vector2i) -> 
 		state["guard_control_quadrant"][to] = state["guard_control_quadrant"][from]
 		state["guard_control_quadrant"].erase(from)
 
-func _state_hit_cell(state: Dictionary, p: Vector2i, attack_dir: int) -> void:
+func _state_hit_cell(state: Dictionary, p: Vector2i, attack_dir: int, award_kill_move: bool = true) -> void:
 	if not _state_cell_is_enemy(state, p):
 		return
 	var cell: int = state["grid"][p.y][p.x]
@@ -1645,7 +1667,7 @@ func _state_hit_cell(state: Dictionary, p: Vector2i, attack_dir: int) -> void:
 	else:
 		_state_clear_enemy(state, p)
 		_state_record_recovery_dir(state, attack_dir)
-		if char_config.teleport_on_kill:
+		if award_kill_move and char_config.teleport_on_kill:
 			state["player_pos"] = p
 			state["player_moved"] = true
 			state["bonus_moves_delta"] += 1
@@ -1671,7 +1693,34 @@ func _apply_recovered_dirs_to_slots(recovered_dirs: Array) -> void:
 			return
 		skill_slots[empty_slot] = [dir_id]
 
-func _apply_skill_to_state(state: Dictionary, slot_data: Array) -> void:
+func _get_skill_slot_sources(slot: int) -> Array:
+	if slot < 0 or slot >= skill_slot_sources.size():
+		return []
+	return skill_slot_sources[slot]
+
+func _rdr_sources_both_attack(source_data: Array) -> bool:
+	return source_data.size() >= 2 and bool(source_data[0]) and bool(source_data[1])
+
+func _rdr_landing_attack_dir(slot_data: Array, source_data: Array) -> int:
+	if not char_config.use_rdr_classifier or slot_data.size() < 2 or source_data.size() < 2:
+		return CharacterData.Direction.NONE
+	var first_is_attack: bool = bool(source_data[0])
+	var second_is_attack: bool = bool(source_data[1])
+	if first_is_attack == second_is_attack:
+		return CharacterData.Direction.NONE
+	return slot_data[0] if first_is_attack else slot_data[1]
+
+func _apply_rdr_landing_move(state: Dictionary, target: Vector2i, attack_dir: int) -> void:
+	if not _state_in_bounds(target, state):
+		return
+	if attack_dir != CharacterData.Direction.NONE and _state_cell_is_enemy(state, target):
+		_state_hit_cell(state, target, attack_dir, false)
+	if _state_cell_is_enemy(state, target):
+		return
+	state["player_pos"] = target
+	state["player_moved"] = true
+
+func _apply_skill_to_state(state: Dictionary, slot_data: Array, source_data: Array = []) -> void:
 	var stype: int = _classify(slot_data)
 	var dv_seq: Vector2i = CharacterData.DIR_VECTOR[slot_data[0]]
 	var dv_atk: Vector2i = CharacterData.DIR_VECTOR[slot_data[1]]
@@ -1705,15 +1754,27 @@ func _apply_skill_to_state(state: Dictionary, slot_data: Array) -> void:
 			_state_hit_cell(state, pos + dv_seq, slot_data[0])
 			_state_hit_cell(state, pos + dv_atk, slot_data[1])
 		CharacterData.SkillType.RDR_DASH:
-			var move_target3: Vector2i = pos + 2 * dv_seq
-			if _state_in_bounds(move_target3, state) and not _state_cell_is_enemy(state, move_target3):
-				state["player_pos"] = move_target3
-				state["player_moved"] = true
+			var mid_cell: Vector2i = pos + dv_seq
+			var end_cell: Vector2i = pos + 2 * dv_seq
+			if _rdr_sources_both_attack(source_data):
+				_state_hit_cell(state, mid_cell, slot_data[0], false)
+				_state_hit_cell(state, end_cell, slot_data[0], false)
+				if _state_in_bounds(end_cell, state) and not _state_cell_is_enemy(state, end_cell):
+					state["player_pos"] = end_cell
+					state["player_moved"] = true
+				elif _state_in_bounds(mid_cell, state) and not _state_cell_is_enemy(state, mid_cell):
+					state["player_pos"] = mid_cell
+					state["player_moved"] = true
+			else:
+				_apply_rdr_landing_move(state, end_cell, _rdr_landing_attack_dir(slot_data, source_data))
 		CharacterData.SkillType.RDR_DIAG:
-			var jump_dest: Vector2i = pos + dv_seq + dv_atk
-			if _state_in_bounds(jump_dest, state) and not _state_cell_is_enemy(state, jump_dest):
-				state["player_pos"] = jump_dest
-				state["player_moved"] = true
+			if _rdr_sources_both_attack(source_data):
+				_state_hit_cell(state, pos + dv_seq, slot_data[0], false)
+				_state_hit_cell(state, pos + dv_atk, slot_data[1], false)
+				_state_hit_cell(state, pos + dv_seq + dv_atk, slot_data[0], false)
+			else:
+				var jump_dest: Vector2i = pos + dv_seq + dv_atk
+				_apply_rdr_landing_move(state, jump_dest, _rdr_landing_attack_dir(slot_data, source_data))
 
 func _count_legal_moves_at(pos: Vector2i, state: Dictionary = {}) -> int:
 	var count: int = 0
@@ -1722,7 +1783,7 @@ func _count_legal_moves_at(pos: Vector2i, state: Dictionary = {}) -> int:
 			count += 1
 	return count
 
-func _skill_changes_state(state: Dictionary, skill: Array) -> bool:
+func _skill_changes_state(state: Dictionary, skill: Array, source_data: Array = []) -> bool:
 	var before_pos: Vector2i = state["player_pos"]
 	var sim: Dictionary = {
 		"grid": _duplicate_grid(state["grid"]),
@@ -1737,7 +1798,7 @@ func _skill_changes_state(state: Dictionary, skill: Array) -> bool:
 		"recovered_dirs": [],
 		"player_moved": false,
 	}
-	_apply_skill_to_state(sim, skill)
+	_apply_skill_to_state(sim, skill, source_data)
 	if sim["kill_delta"] > 0:
 		return true
 	if sim["player_pos"] != before_pos:
@@ -1749,8 +1810,10 @@ func _skill_changes_state(state: Dictionary, skill: Array) -> bool:
 func _count_effective_skills() -> int:
 	var state: Dictionary = _board_state()
 	var effective: int = 0
-	for slot_data: Array in skill_slots:
-		if slot_data.size() == 3 and _skill_changes_state(state, slot_data):
+	for i: int in skill_slots.size():
+		var slot_data: Array = skill_slots[i]
+		var source_data: Array = _get_skill_slot_sources(i)
+		if slot_data.size() == 3 and _skill_changes_state(state, slot_data, source_data):
 			effective += 1
 	return effective
 

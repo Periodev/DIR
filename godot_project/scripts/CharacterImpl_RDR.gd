@@ -10,6 +10,6 @@ static func get_config() -> CharacterData.Config:
 	c.teleport_on_kill = true
 	c.skill_mixed    = false
 	c.use_rdr_classifier = true
-	c.skill_slot_count = 3
+	c.skill_slot_count = 4
 	c.use_unified_slots = true
 	return c
