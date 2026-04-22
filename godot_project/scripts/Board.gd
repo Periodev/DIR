@@ -12,13 +12,6 @@ const SEQ_STEP: float = SEQ_SIZE + SEQ_GAP
 const SEQ_MARGIN_TOP: float = 20.0
 const ATK_QUEUE_GAP: float = 12.0
 const SKILL_MARGIN_TOP: float = 20.0
-const EXE_STAT_KEYS: Array[String] = ["pierce", "ram", "spin", "dual"]
-const EXE_STAT_LABELS: Dictionary = {
-	"pierce": "PEN",
-	"ram": "RAM",
-	"spin": "SPN",
-	"dual": "DBL",
-}
 
 signal board_updated
 
@@ -36,15 +29,11 @@ var attacks_this_turn: int = 0
 var bonus_moves: int = 0
 var bonus_attacks: int = 0
 var turn: int = 1
-var avg_slot_sum: int = 0
-var avg_slot_samples: int = 0
-var step_move_count: int = 0
-var step_attack_count: int = 0
-var exe_skill_stats: Dictionary = {}
 
 var skill_slots: Array = []
 var skill_preview: int = -1
 var synthesis: VectorSynthesisState = VectorSynthesisState.new()
+var score_tracker: RefCounted = null
 var kill_count: int = 0
 var shield_spawn_turn: Dictionary = {}
 var enemy_spawn_turn: Dictionary = {}
@@ -64,6 +53,7 @@ var _guard_quadrant_counts: Array = [0, 0, 0, 0]
 var _guard_active_quadrant: int = -1
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
+const _SCORE_TRACKER_SCRIPT = preload("res://scripts/ScoreTracker.gd")
 
 var cell_nodes: Array[Array] = []
 var _cell_scene: PackedScene = null
@@ -281,6 +271,8 @@ func _ready() -> void:
 
 func restart() -> void:
 	_load_char_config()
+	if score_tracker == null:
+		score_tracker = _SCORE_TRACKER_SCRIPT.new()
 	_rng.randomize()
 	_board_cols = 4 if _play_mode == PlayMode.SURVIVAL else COLS
 	_board_rows = 4 if _play_mode == PlayMode.SURVIVAL else ROWS
@@ -301,11 +293,7 @@ func restart() -> void:
 	bonus_moves = 0
 	bonus_attacks = 0
 	turn = 1
-	avg_slot_sum = 0
-	avg_slot_samples = 0
-	step_move_count = 0
-	step_attack_count = 0
-	_reset_exe_skill_stats()
+	score_tracker.reset()
 	skill_slots.resize(char_config.skill_slot_count)
 	for i: int in char_config.skill_slot_count:
 		skill_slots[i] = []
@@ -459,78 +447,20 @@ func _count_occupied_skill_slots() -> int:
 	return occupied
 
 func _record_slot_usage_sample() -> void:
-	avg_slot_sum += _count_occupied_skill_slots()
-	avg_slot_samples += 1
+	score_tracker.record_slot_usage(_count_occupied_skill_slots())
 
 func _record_step_stats(is_move: bool, is_attack: bool) -> void:
-	if is_move:
-		step_move_count += 1
-	if is_attack:
-		step_attack_count += 1
-	_record_slot_usage_sample()
-
-func _get_average_slot_usage() -> float:
-	if avg_slot_samples <= 0:
-		return 0.0
-	return float(avg_slot_sum) / float(avg_slot_samples)
-
-func _get_move_usage_ratio() -> float:
-	var total_steps: int = step_move_count + step_attack_count
-	if total_steps <= 0:
-		return 0.0
-	return float(step_move_count) / float(total_steps)
-
-func _reset_exe_skill_stats() -> void:
-	exe_skill_stats.clear()
-	for key: String in EXE_STAT_KEYS:
-		exe_skill_stats[key] = {
-			"synth": 0,
-			"cast": 0,
-			"kills": 0,
-			"recovery": 0,
-		}
-
-func _exe_skill_stat_key(stype: int) -> String:
-	match stype:
-		CharacterData.SkillType.SAME_AA:
-			return "pierce"
-		CharacterData.SkillType.SAME_MA:
-			return "ram"
-		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
-			return "spin"
-		CharacterData.SkillType.ORTHO_AA:
-			return "dual"
-		_:
-			return ""
+	score_tracker.record_step(is_move, is_attack, _count_occupied_skill_slots())
 
 func _record_exe_skill_synthesis(slot_data: Array) -> void:
 	if slot_data.size() != 3:
 		return
-	var key: String = _exe_skill_stat_key(_classify(slot_data))
-	if key.is_empty():
-		return
-	var stats: Dictionary = exe_skill_stats.get(key, {})
-	stats["synth"] = int(stats.get("synth", 0)) + 1
-	exe_skill_stats[key] = stats
+	score_tracker.record_skill_synthesis(_classify(slot_data))
 
 func _record_exe_skill_cast(slot_data: Array, kills: int, recovery: int) -> void:
 	if slot_data.size() != 3:
 		return
-	var key: String = _exe_skill_stat_key(_classify(slot_data))
-	if key.is_empty():
-		return
-	var stats: Dictionary = exe_skill_stats.get(key, {})
-	stats["cast"] = int(stats.get("cast", 0)) + 1
-	stats["kills"] = int(stats.get("kills", 0)) + kills
-	stats["recovery"] = int(stats.get("recovery", 0)) + recovery
-	exe_skill_stats[key] = stats
-
-func _get_total_exe_skill_syntheses() -> int:
-	var total: int = 0
-	for key: String in EXE_STAT_KEYS:
-		var stats: Dictionary = exe_skill_stats.get(key, {})
-		total += int(stats.get("synth", 0))
-	return total
+	score_tracker.record_skill_cast(_classify(slot_data), kills, recovery)
 
 func try_combine_skill() -> bool:
 	if game_over:
@@ -799,8 +729,8 @@ func _draw() -> void:
 
 	var rem_moves: int = char_config.max_moves + bonus_moves - moves_this_turn
 	var rem_atk: int = char_config.max_attacks + bonus_attacks - attacks_this_turn
-	var avg_slot_usage: float = _get_average_slot_usage()
-	var move_usage_ratio: float = _get_move_usage_ratio()
+	var avg_slot_usage: float = score_tracker.average_slot_usage()
+	var move_usage_ratio: float = score_tracker.move_usage_ratio()
 	var skill_font_size: int = 26
 	var exe_slot_x0: float = 0.0
 	var exe_slot_y: float = base_ui_y
@@ -897,26 +827,18 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
 	draw_string(font, Vector2(side_x, 466.0), "%.0f%%" % (move_usage_ratio * 100.0),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.85, 0.95, 1.0))
-	var total_synth: int = _get_total_exe_skill_syntheses()
 	draw_string(font, Vector2(side_x, 506.0), "EXE SKILL",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
 	draw_string(font, Vector2(side_x, 530.0), "SKL S% K R%",
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.7, 0.75))
-	for i: int in EXE_STAT_KEYS.size():
-		var key: String = EXE_STAT_KEYS[i]
-		var stats: Dictionary = exe_skill_stats.get(key, {})
-		var synth: int = int(stats.get("synth", 0))
-		var cast: int = int(stats.get("cast", 0))
-		var kills: int = int(stats.get("kills", 0))
-		var recovery: int = int(stats.get("recovery", 0))
-		var synth_pct: int = 0 if total_synth <= 0 else int(round(float(synth) * 100.0 / float(total_synth)))
-		var avg_kills: float = 0.0 if cast <= 0 else float(kills) / float(cast)
-		var recovery_pct: int = 0 if cast <= 0 else int(round(float(recovery) * 50.0 / float(cast)))
+	var skill_rows: Array[Dictionary] = score_tracker.skill_rows()
+	for i: int in skill_rows.size():
+		var row: Dictionary = skill_rows[i]
 		var row_text: String = "%s %2d %.1f %2d" % [
-			EXE_STAT_LABELS[key],
-			synth_pct,
-			avg_kills,
-			recovery_pct,
+			row["label"],
+			row["synth_pct"],
+			row["avg_kills"],
+			row["recovery_pct"],
 		]
 		draw_string(font, Vector2(side_x, 552.0 + i * 18.0), row_text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.9, 0.9, 0.95))
@@ -1377,45 +1299,14 @@ func _count_polluted_chokepoints() -> int:
 	return chokepoints
 
 func score_pollution_threat() -> Dictionary:
-	var score: int = 0
-	var legal_moves: int = _count_legal_moves_at(player_pos)
-	var effective_skills: int = _count_effective_skills()
-	var patterns: Array[String] = []
-	if is_polluted(player_pos):
-		score += 35
-		patterns.append("player_on_pollution")
-		if _has_combinable_material():
-			score += 12
-			patterns.append("combine_locked")
-	score += (4 - legal_moves) * 10
-	if legal_moves <= 1:
-		score += 8
-		patterns.append("low_escape")
-	var central_pollution: int = _count_central_pollution()
-	score += central_pollution * 3
-	if central_pollution >= 4:
-		patterns.append("central_pollution")
-	var cluster: int = _largest_pollution_cluster()
-	if cluster >= 3:
-		score += min(14, cluster * 2)
-		patterns.append("pollution_chain")
-	var chokepoints: int = _count_polluted_chokepoints()
-	if chokepoints > 0:
-		score += min(12, chokepoints * 4)
-		patterns.append("pollution_pocket")
-	if effective_skills == 0:
-		score += 20
-		patterns.append("no_effective_skill")
-	elif effective_skills == 1:
-		score += 10
-	if game_over:
-		score = 100
-		patterns.append("failed")
-	return {
-		"score": clamp(score, 0, 100),
+	return score_tracker.score_pollution_threat({
+		"player_on_pollution": is_polluted(player_pos),
+		"has_combinable_material": _has_combinable_material(),
+		"legal_moves": _count_legal_moves_at(player_pos),
+		"effective_skills": _count_effective_skills(),
+		"central_pollution": _count_central_pollution(),
+		"largest_pollution_cluster": _largest_pollution_cluster(),
+		"polluted_chokepoints": _count_polluted_chokepoints(),
 		"polluted_tiles": _count_polluted_tiles(),
-		"central_pollution": central_pollution,
-		"legal_moves": legal_moves,
-		"effective_skills": effective_skills,
-		"patterns": patterns,
-	}
+		"game_over": game_over,
+	})
