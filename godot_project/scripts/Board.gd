@@ -342,13 +342,13 @@ func is_skill_slot_complete(slot: int) -> bool:
 
 func _synthesis_slot_sizes() -> Array[int]:
 	var sizes: Array[int] = []
-	for slot_data: Array in synthesis.slots:
-		sizes.append(slot_data.size())
+	for i: int in synthesis.slots.size():
+		sizes.append(synthesis.slot_token_count(i))
 	return sizes
 
 func _record_new_exe_syntheses(before_sizes: Array[int]) -> void:
 	for i: int in synthesis.slots.size():
-		if i < before_sizes.size() and before_sizes[i] < 2 and synthesis.slots[i].size() == 2:
+		if i < before_sizes.size() and before_sizes[i] < 2 and synthesis.slot_token_count(i) == 2:
 			_record_exe_skill_synthesis(synthesis.legacy_slot(i))
 
 func _auto_store_exe_pending() -> bool:
@@ -761,7 +761,7 @@ func _draw() -> void:
 		elif slot_data.size() == 1:
 			draw_rect(srect, Color(0.16, 0.09, 0.04) if is_armed else Color(0.10, 0.10, 0.13))
 			draw_rect(srect, Color(1.0, 0.6, 0.15) if is_armed else Color(0.40, 0.25, 0.08), false, 2.5 if is_armed else 1.5)
-			var single_col: Color = Color(1.0, 0.6, 0.15) if VectorSynthesisState.token_is_attack(synthesis.slots[i][0]) else Color.WHITE
+			var single_col: Color = Color(1.0, 0.6, 0.15) if VectorSynthesisState.token_is_attack(synthesis.slot_first_token(i)) else Color.WHITE
 			var atk_text_y: float = slot_y + (SEQ_SIZE + font_size * 0.7) / 2.0
 			draw_string(font, Vector2(sx, atk_text_y), CharacterData.DIR_ARROWS[slot_data[0]], HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, single_col)
 		else:
@@ -778,15 +778,17 @@ func _draw() -> void:
 	var action_rect: Rect2 = Rect2(action_x, seq_y, SEQ_SIZE, SEQ_SIZE)
 	draw_rect(temp_rect, Color(0.10, 0.10, 0.13))
 	draw_rect(action_rect, Color(0.10, 0.10, 0.13))
-	if synthesis.pending_attack_token != VectorSynthesisState.NO_TOKEN:
+	var pending_attack_token: int = synthesis.pending_attack_token()
+	var pending_move_token: int = synthesis.pending_move_token()
+	if pending_attack_token != VectorSynthesisState.NO_TOKEN:
 		_draw_dashed_rect_outline(temp_rect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
 		var temp_y: float = temp_rect.position.y + (temp_rect.size.y + font_size * 0.7) / 2.0
-		draw_string(font, Vector2(temp_rect.position.x, temp_y), CharacterData.DIR_ARROWS[VectorSynthesisState.token_board_dir(synthesis.pending_attack_token)],
+		draw_string(font, Vector2(temp_rect.position.x, temp_y), CharacterData.DIR_ARROWS[VectorSynthesisState.token_board_dir(pending_attack_token)],
 			HORIZONTAL_ALIGNMENT_CENTER, temp_rect.size.x, font_size, Color(1.0, 0.72, 0.4, 0.65))
-	if synthesis.pending_move_token != VectorSynthesisState.NO_TOKEN:
+	if pending_move_token != VectorSynthesisState.NO_TOKEN:
 		draw_rect(action_rect, Color(0.30, 0.30, 0.35), false, 1.5)
 		var move_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-		draw_string(font, Vector2(action_x, move_y), CharacterData.DIR_ARROWS[VectorSynthesisState.token_board_dir(synthesis.pending_move_token)],
+		draw_string(font, Vector2(action_x, move_y), CharacterData.DIR_ARROWS[VectorSynthesisState.token_board_dir(pending_move_token)],
 			HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color.WHITE)
 
 	var bottom_stat_x: float = 8.0
