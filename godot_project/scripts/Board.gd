@@ -34,6 +34,7 @@ var skill_slots: Array = []
 var skill_preview: int = -1
 var synthesis: VectorSynthesisState = VectorSynthesisState.new()
 var score_tracker: RefCounted = null
+var board_rules: RefCounted = null
 var kill_count: int = 0
 var shield_spawn_turn: Dictionary = {}
 var enemy_spawn_turn: Dictionary = {}
@@ -54,6 +55,8 @@ var _guard_active_quadrant: int = -1
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 const _SCORE_TRACKER_SCRIPT = preload("res://scripts/ScoreTracker.gd")
+const _BOARD_STATE_SCRIPT = preload("res://scripts/BoardState.gd")
+const _BOARD_RULES_SCRIPT = preload("res://scripts/BoardRules.gd")
 
 var cell_nodes: Array[Array] = []
 var _cell_scene: PackedScene = null
@@ -273,6 +276,8 @@ func restart() -> void:
 	_load_char_config()
 	if score_tracker == null:
 		score_tracker = _SCORE_TRACKER_SCRIPT.new()
+	if board_rules == null:
+		board_rules = _BOARD_RULES_SCRIPT.new()
 	_rng.randomize()
 	_board_cols = 4 if _play_mode == PlayMode.SURVIVAL else COLS
 	_board_rows = 4 if _play_mode == PlayMode.SURVIVAL else ROWS
@@ -360,12 +365,9 @@ func _auto_store_exe_pending() -> bool:
 func can_combine_skill() -> bool:
 	return true
 
-func is_basic_move_legal(from: Vector2i, dir: int, state: Dictionary = {}) -> bool:
-	var target: Vector2i = from + CharacterData.DIR_VECTOR[dir]
-	if not _in_bounds(target):
-		return false
-	var board_grid: Array = grid if state.is_empty() else state["grid"]
-	return board_grid[target.y][target.x] == CharacterData.CellType.LIVE
+func is_basic_move_legal(from: Vector2i, dir: int, state: RefCounted = null) -> bool:
+	var board_state: RefCounted = _make_board_state(false) if state == null else state
+	return board_rules.is_basic_move_legal(board_state, from, dir, _board_cols, _board_rows)
 
 func try_move(dir: int) -> bool:
 	if game_over:
@@ -1004,198 +1006,52 @@ func use_skill(slot: int) -> void:
 	if slot < 0 or slot >= char_config.skill_slot_count or slot_data.size() != 3:
 		return
 	var cast_skill: Array = slot_data.duplicate()
-	var live_state: Dictionary = {
-		"grid": grid,
-		"polluted_grid": polluted_grid,
-		"player_pos": player_pos,
-		"shield_spawn_turn": shield_spawn_turn,
-		"enemy_spawn_turn": enemy_spawn_turn,
-		"enemy_pollution_dir": enemy_pollution_dir,
-		"guard_control_quadrant": guard_control_quadrant,
-		"kill_delta": 0,
-		"bonus_moves_delta": 0,
-		"recovered_dirs": [],
-		"player_moved": false,
-	}
-	_apply_skill_to_state(live_state, cast_skill)
-	grid = live_state["grid"]
-	polluted_grid = live_state["polluted_grid"]
-	player_pos = live_state["player_pos"]
-	shield_spawn_turn = live_state["shield_spawn_turn"]
-	enemy_spawn_turn = live_state["enemy_spawn_turn"]
-	enemy_pollution_dir = live_state["enemy_pollution_dir"]
-	guard_control_quadrant = live_state["guard_control_quadrant"]
-	kill_count += int(live_state["kill_delta"])
-	bonus_moves += int(live_state["bonus_moves_delta"])
-	_record_exe_skill_cast(cast_skill, int(live_state["kill_delta"]), live_state["recovered_dirs"].size())
+	var live_state: RefCounted = _make_board_state(false)
+	board_rules.apply_skill_to_state(live_state, cast_skill, _board_cols, _board_rows, char_config.teleport_on_kill)
+	grid = live_state.grid
+	polluted_grid = live_state.polluted_grid
+	player_pos = live_state.player_pos
+	shield_spawn_turn = live_state.shield_spawn_turn
+	enemy_spawn_turn = live_state.enemy_spawn_turn
+	enemy_pollution_dir = live_state.enemy_pollution_dir
+	guard_control_quadrant = live_state.guard_control_quadrant
+	kill_count += live_state.kill_delta
+	bonus_moves += live_state.bonus_moves_delta
+	_record_exe_skill_cast(cast_skill, live_state.kill_delta, live_state.recovered_dirs.size())
 	synthesis.clear_slot(slot)
 	_sync_exe_skill_slots()
-	_apply_recovered_dirs_to_slots(live_state["recovered_dirs"])
+	_apply_recovered_dirs_to_slots(live_state.recovered_dirs)
 	_record_step_stats(false, true)
 	_refresh_visuals()
 
-func _board_state() -> Dictionary:
-	return {
-		"grid": _duplicate_grid(grid),
-		"polluted_grid": _duplicate_bool_grid(polluted_grid),
-		"player_pos": player_pos,
-		"shield_spawn_turn": shield_spawn_turn.duplicate(true),
-		"enemy_spawn_turn": enemy_spawn_turn.duplicate(true),
-		"enemy_pollution_dir": enemy_pollution_dir.duplicate(true),
-		"guard_control_quadrant": guard_control_quadrant.duplicate(true),
-		"kill_delta": 0,
-		"bonus_moves_delta": 0,
-		"recovered_dirs": [],
-		"player_moved": false,
-	}
-
-func _duplicate_grid(source: Array) -> Array:
-	var copy: Array = []
-	for row: Array in source:
-		copy.append(row.duplicate())
-	return copy
-
-func _duplicate_bool_grid(source: Array) -> Array:
-	var copy: Array = []
-	for row: Array in source:
-		copy.append(row.duplicate())
-	return copy
-
-func _state_in_bounds(p: Vector2i, state: Dictionary) -> bool:
-	return p.x >= 0 and p.x < _board_cols and p.y >= 0 and p.y < _board_rows
-
-func _state_cell_is_enemy(state: Dictionary, p: Vector2i) -> bool:
-	return _state_in_bounds(p, state) and CharacterData.is_enemy(state["grid"][p.y][p.x])
-
-func _state_is_polluted(state: Dictionary, p: Vector2i) -> bool:
-	return _state_in_bounds(p, state) and state["polluted_grid"][p.y][p.x]
-
-func _state_clear_enemy(state: Dictionary, p: Vector2i) -> void:
-	if not _state_cell_is_enemy(state, p):
-		return
-	state["grid"][p.y][p.x] = CharacterData.CellType.LIVE
-	state["shield_spawn_turn"].erase(p)
-	state["enemy_spawn_turn"].erase(p)
-	state["enemy_pollution_dir"].erase(p)
-	state["guard_control_quadrant"].erase(p)
-	state["kill_delta"] += 1
-
-func _state_move_enemy_data(state: Dictionary, from: Vector2i, to: Vector2i) -> void:
-	if state["shield_spawn_turn"].has(from):
-		state["shield_spawn_turn"][to] = state["shield_spawn_turn"][from]
-		state["shield_spawn_turn"].erase(from)
-	if state["enemy_spawn_turn"].has(from):
-		state["enemy_spawn_turn"][to] = state["enemy_spawn_turn"][from]
-		state["enemy_spawn_turn"].erase(from)
-	if state["enemy_pollution_dir"].has(from):
-		state["enemy_pollution_dir"][to] = state["enemy_pollution_dir"][from]
-		state["enemy_pollution_dir"].erase(from)
-	if state["guard_control_quadrant"].has(from):
-		state["guard_control_quadrant"][to] = state["guard_control_quadrant"][from]
-		state["guard_control_quadrant"].erase(from)
-
-func _state_hit_cell(state: Dictionary, p: Vector2i, attack_dir: int, award_kill_move: bool = true) -> void:
-	if not _state_cell_is_enemy(state, p):
-		return
-	var cell: int = state["grid"][p.y][p.x]
-	var shield_dir: int = CharacterData.get_shield_dir(cell)
-	if shield_dir != CharacterData.Direction.NONE \
-	and CharacterData.DIR_VECTOR[attack_dir] + CharacterData.DIR_VECTOR[shield_dir] == Vector2i.ZERO:
-		if not CharacterData.is_hard_shield(cell):
-			state["grid"][p.y][p.x] = CharacterData.CellType.ENEMY
-			state["shield_spawn_turn"].erase(p)
-	else:
-		_state_clear_enemy(state, p)
-		_state_record_recovery_dir(state, attack_dir)
-		if award_kill_move and char_config.teleport_on_kill:
-			state["player_pos"] = p
-			state["player_moved"] = true
-			state["bonus_moves_delta"] += 1
-
-func _state_record_recovery_dir(state: Dictionary, attack_dir: int) -> void:
-	if attack_dir == CharacterData.Direction.NONE:
-		return
-	if not state.has("recovered_dirs"):
-		state["recovered_dirs"] = []
-	var recovered_dirs: Array = state["recovered_dirs"]
-	if recovered_dirs.size() >= 2:
-		return
-	if recovered_dirs.has(attack_dir):
-		return
-	recovered_dirs.append(attack_dir)
+func _make_board_state(duplicate_data: bool = true) -> RefCounted:
+	var state: RefCounted = _BOARD_STATE_SCRIPT.new()
+	state.load_from_board(
+		grid,
+		polluted_grid,
+		player_pos,
+		shield_spawn_turn,
+		enemy_spawn_turn,
+		enemy_pollution_dir,
+		guard_control_quadrant,
+		duplicate_data
+	)
+	return state
 
 func _apply_recovered_dirs_to_slots(recovered_dirs: Array) -> void:
 	if not recovered_dirs.is_empty():
 		synthesis.record_attack_kill(recovered_dirs[0])
 	_sync_exe_skill_slots()
 
-func _apply_skill_to_state(state: Dictionary, slot_data: Array) -> void:
-	var stype: int = _classify(slot_data)
-	var dv_seq: Vector2i = CharacterData.DIR_VECTOR[slot_data[0]]
-	var dv_atk: Vector2i = CharacterData.DIR_VECTOR[slot_data[1]]
-	var pos: Vector2i = state["player_pos"]
-	match stype:
-		CharacterData.SkillType.SAME_MA:
-			var move_target: Vector2i = pos + dv_seq
-			if _state_in_bounds(move_target, state):
-				if _state_cell_is_enemy(state, move_target):
-					_state_hit_cell(state, move_target, slot_data[0])
-					if _state_cell_is_enemy(state, move_target):
-						var push_dest: Vector2i = move_target + dv_seq
-						if not _state_in_bounds(push_dest, state) or _state_cell_is_enemy(state, push_dest):
-							_state_hit_cell(state, move_target, CharacterData.opposite_dir(slot_data[0]))
-						else:
-							state["grid"][push_dest.y][push_dest.x] = state["grid"][move_target.y][move_target.x]
-							state["grid"][move_target.y][move_target.x] = CharacterData.CellType.LIVE
-							_state_move_enemy_data(state, move_target, push_dest)
-				state["player_pos"] = move_target
-				state["player_moved"] = true
-		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
-			var move_target2: Vector2i = pos + dv_seq
-			if _state_in_bounds(move_target2, state) and state["grid"][move_target2.y][move_target2.x] == CharacterData.CellType.LIVE:
-				state["player_pos"] = move_target2
-				state["player_moved"] = true
-				_state_hit_cell(state, state["player_pos"] + dv_atk, slot_data[1])
-		CharacterData.SkillType.SAME_AA:
-			_state_hit_cell(state, pos + dv_seq, slot_data[0])
-			_state_hit_cell(state, pos + 2 * dv_seq, slot_data[0])
-		CharacterData.SkillType.ORTHO_AA:
-			_state_hit_cell(state, pos + dv_seq, slot_data[0])
-			_state_hit_cell(state, pos + dv_atk, slot_data[1])
+func _count_legal_moves_at(pos: Vector2i, state: RefCounted = null) -> int:
+	var board_state: RefCounted = _make_board_state(false) if state == null else state
+	return board_rules.count_legal_moves_at(board_state, pos, _board_cols, _board_rows)
 
-func _count_legal_moves_at(pos: Vector2i, state: Dictionary = {}) -> int:
-	var count: int = 0
-	for dir_id: int in CharacterData.DIR_VECTOR:
-		if is_basic_move_legal(pos, dir_id, state):
-			count += 1
-	return count
-
-func _skill_changes_state(state: Dictionary, skill: Array) -> bool:
-	var before_pos: Vector2i = state["player_pos"]
-	var sim: Dictionary = {
-		"grid": _duplicate_grid(state["grid"]),
-		"polluted_grid": _duplicate_bool_grid(state["polluted_grid"]),
-		"player_pos": before_pos,
-		"shield_spawn_turn": state["shield_spawn_turn"].duplicate(true),
-		"enemy_spawn_turn": state["enemy_spawn_turn"].duplicate(true),
-		"enemy_pollution_dir": state["enemy_pollution_dir"].duplicate(true),
-		"guard_control_quadrant": state["guard_control_quadrant"].duplicate(true),
-		"kill_delta": 0,
-		"bonus_moves_delta": 0,
-		"recovered_dirs": [],
-		"player_moved": false,
-	}
-	_apply_skill_to_state(sim, skill)
-	if sim["kill_delta"] > 0:
-		return true
-	if sim["player_pos"] != before_pos:
-		return true
-	if not _state_is_polluted(sim, sim["player_pos"]):
-		return true
-	return _count_legal_moves_at(sim["player_pos"], sim) > 0
+func _skill_changes_state(state: RefCounted, skill: Array) -> bool:
+	return board_rules.skill_changes_state(state, skill, _board_cols, _board_rows, char_config.teleport_on_kill)
 
 func _count_effective_skills() -> int:
-	var state: Dictionary = _board_state()
+	var state: RefCounted = _make_board_state()
 	var effective: int = 0
 	for i: int in skill_slots.size():
 		var slot_data: Array = skill_slots[i]
