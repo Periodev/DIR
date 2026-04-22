@@ -52,7 +52,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	var dir: int = CharacterData.key_to_direction(keycode)
 	if dir != CharacterData.Direction.NONE:
-		if board.skill_preview >= 0:
+		if board.has_rdr_followup_attack() and board.try_rdr_followup_attack(dir):
+			pass
+		elif board.skill_preview >= 0:
 			board.rotate_armed_skill(dir)
 		else:
 			if not board.try_attack(dir):
@@ -61,6 +63,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if keycode == KEY_SPACE:
+		board.clear_rdr_followup_attack()
 		if board.skill_preview >= 0:
 			var slot_data: Array = board.skill_slots[board.skill_preview]
 			if slot_data.size() == 3:

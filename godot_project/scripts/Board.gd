@@ -72,6 +72,7 @@ var _debug_skill_slot_override: int = -1
 var _guard_quadrant_counts: Array = [0, 0, 0, 0]
 var _guard_active_quadrant: int = -1
 var rdr_pending_is_attack: bool = false
+var rdr_followup_attack_available: bool = false
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 const _RDR_SCRIPT = preload("res://scripts/CharacterImpl_RDR.gd")
@@ -317,6 +318,7 @@ func restart() -> void:
 	exe_pending_attack_slot = -1
 	rdr_pending_vector = CharacterData.Direction.NONE
 	rdr_pending_is_attack = false
+	rdr_followup_attack_available = false
 	moves_this_turn = 0
 	attacks_this_turn = 0
 	bonus_moves = 0
@@ -357,6 +359,12 @@ func can_accept_input() -> bool:
 
 func can_combine_skill() -> bool:
 	return true
+
+func has_rdr_followup_attack() -> bool:
+	return rdr_followup_attack_available
+
+func clear_rdr_followup_attack() -> void:
+	rdr_followup_attack_available = false
 
 func is_basic_move_legal(from: Vector2i, dir: int, state: Dictionary = {}) -> bool:
 	var target: Vector2i = from + CharacterData.DIR_VECTOR[dir]
@@ -428,12 +436,40 @@ func try_attack(dir: int) -> bool:
 	_refresh_visuals()
 	return true
 
+func try_rdr_followup_attack(dir: int) -> bool:
+	if game_over or not rdr_followup_attack_available:
+		return false
+	rdr_followup_attack_available = false
+	var target: Vector2i = player_pos + CharacterData.DIR_VECTOR[dir]
+	if not _in_bounds(target):
+		_refresh_visuals()
+		return false
+	if not CharacterData.is_enemy(grid[target.y][target.x]):
+		_refresh_visuals()
+		return false
+	var shield_dir: int = CharacterData.get_shield_dir(grid[target.y][target.x])
+	if shield_dir != CharacterData.Direction.NONE \
+	and CharacterData.DIR_VECTOR[dir] + CharacterData.DIR_VECTOR[shield_dir] == Vector2i.ZERO:
+		if not CharacterData.is_hard_shield(grid[target.y][target.x]):
+			grid[target.y][target.x] = CharacterData.CellType.ENEMY
+	else:
+		_clear_enemy(target)
+		if char_config.teleport_on_kill:
+			player_pos = target
+	var killed: bool = grid[target.y][target.x] == CharacterData.CellType.LIVE
+	if killed:
+		_record_rdr_vector(dir, true)
+	_record_step_stats(false, true)
+	_refresh_visuals()
+	return true
+
 func try_end_turn() -> bool:
 	if game_over:
 		return false
 	if not _resolve_exe_pending_attack_default():
 		return false
 	_clear_rdr_pending_vector()
+	clear_rdr_followup_attack()
 	if char_config.use_unified_slots and not char_config.use_rdr_classifier and not char_config.use_exe_manual_slotting:
 		var new_attacks: Array[int] = []
 		for i: int in action_seq.size():
@@ -1510,6 +1546,8 @@ func get_skill_preview_cells(slot: int) -> Dictionary:
 	return result
 
 func set_skill_preview(slot: int) -> void:
+	if slot >= 0:
+		clear_rdr_followup_attack()
 	skill_preview = slot
 	if _arrow_overlay:
 		_arrow_overlay.queue_redraw()
@@ -1583,7 +1621,10 @@ func use_skill(slot: int) -> void:
 	guard_control_quadrant = live_state["guard_control_quadrant"]
 	kill_count += int(live_state["kill_delta"])
 	bonus_moves += int(live_state["bonus_moves_delta"])
-	if char_config.use_rdr_classifier:
+	if char_config.use_rdr_classifier and (_rdr_sources_both_move(cast_sources) or _rdr_sources_mixed_move_attack(cast_sources)):
+		if bool(live_state["player_moved"]):
+			rdr_followup_attack_available = true
+	elif char_config.use_rdr_classifier:
 		bonus_attacks += 1
 	_record_exe_skill_cast(cast_skill, int(live_state["kill_delta"]), live_state["recovered_dirs"].size())
 	skill_slots[slot] = []
@@ -1701,6 +1742,12 @@ func _get_skill_slot_sources(slot: int) -> Array:
 func _rdr_sources_both_attack(source_data: Array) -> bool:
 	return source_data.size() >= 2 and bool(source_data[0]) and bool(source_data[1])
 
+func _rdr_sources_both_move(source_data: Array) -> bool:
+	return source_data.size() >= 2 and not bool(source_data[0]) and not bool(source_data[1])
+
+func _rdr_sources_mixed_move_attack(source_data: Array) -> bool:
+	return source_data.size() >= 2 and bool(source_data[0]) != bool(source_data[1])
+
 func _rdr_landing_attack_dir(slot_data: Array, source_data: Array) -> int:
 	if not char_config.use_rdr_classifier or slot_data.size() < 2 or source_data.size() < 2:
 		return CharacterData.Direction.NONE
@@ -1713,8 +1760,11 @@ func _rdr_landing_attack_dir(slot_data: Array, source_data: Array) -> int:
 func _apply_rdr_landing_move(state: Dictionary, target: Vector2i, attack_dir: int) -> void:
 	if not _state_in_bounds(target, state):
 		return
+	var kills_before: int = int(state["kill_delta"])
 	if attack_dir != CharacterData.Direction.NONE and _state_cell_is_enemy(state, target):
 		_state_hit_cell(state, target, attack_dir, false)
+		if int(state["kill_delta"]) > kills_before:
+			state["bonus_moves_delta"] += 1
 	if _state_cell_is_enemy(state, target):
 		return
 	state["player_pos"] = target

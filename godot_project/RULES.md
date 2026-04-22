@@ -8,7 +8,7 @@
 
 ## Characters
 - `EXE`: 5 sequence slots, 3 moves, 2 attacks, 4 unified skill slots.
-- `RDR`: 9 sequence slots, 2 moves, 1 attack, 3 unified skill slots, teleport-on-kill behavior, and gains `+1` bonus attack after using a skill.
+- `RDR`: 9 sequence slots, 2 moves, 1 attack, 3 unified skill slots, teleport-on-kill behavior. MM and MA/AM skills that land grant one free adjacent follow-up attack instead of `+1` attack; MA/AM also grants `+1` move when the landing hit kills.
 
 ## Pollution
 - Pollution is a persistent terrain layer. It is separate from enemy occupancy and can coexist with enemies.
