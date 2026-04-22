@@ -13,17 +13,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	var skill_keycodes: Array[Key] = [KEY_Z, KEY_X, KEY_C, KEY_V, KEY_B, KEY_N, KEY_M, KEY_COMMA]
 	for i: int in skill_keycodes.size():
 		if keycode == skill_keycodes[i]:
-			board.set_skill_preview(i if board.skill_preview != i else -1)
+			board.set_skill_preview(i if board.get_selected_skill_slot() != i else -1)
 			get_viewport().set_input_as_handled()
 			return
 
 	if keycode == KEY_R:
 		board.restart()
-		get_viewport().set_input_as_handled()
-		return
-
-	if keycode == KEY_F2:
-		board.switch_character()
 		get_viewport().set_input_as_handled()
 		return
 
@@ -52,9 +47,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	var dir: int = CharacterData.key_to_direction(keycode)
 	if dir != CharacterData.Direction.NONE:
-		if board.has_rdr_followup_attack() and board.try_rdr_followup_attack(dir):
-			pass
-		elif board.skill_preview >= 0:
+		if board.get_selected_skill_slot() >= 0:
 			board.rotate_armed_skill(dir)
 		else:
 			if not board.try_attack(dir):
@@ -63,11 +56,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if keycode == KEY_SPACE:
-		board.clear_rdr_followup_attack()
-		if board.skill_preview >= 0:
-			var slot_data: Array = board.skill_slots[board.skill_preview]
-			if slot_data.size() == 3:
-				board.use_skill(board.skill_preview)
+		var selected_slot: int = board.get_selected_skill_slot()
+		if selected_slot >= 0:
+			if board.is_skill_slot_complete(selected_slot):
+				board.use_skill(selected_slot)
 				board.set_skill_preview(-1)
 			else:
 				board.try_combine_skill()

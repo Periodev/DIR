@@ -27,16 +27,10 @@ enum PlayMode { NORMAL, GUARD, SURVIVAL }
 enum GuardQuadrant { TL, TR, BL, BR }
 
 var char_config: CharacterData.Config = null
-var _char_index: int = 0
 
 var grid: Array[Array] = []
 var polluted_grid: Array[Array] = []
 var player_pos: Vector2i = Vector2i(COLS / 2, ROWS / 2)
-var action_seq: Array[int] = []
-var action_seq_is_attack: Array[bool] = []
-var action_seq_used_for_space: Array[bool] = []
-var exe_pending_attack_slot: int = -1
-var rdr_pending_vector: int = CharacterData.Direction.NONE
 var moves_this_turn: int = 0
 var attacks_this_turn: int = 0
 var bonus_moves: int = 0
@@ -48,12 +42,9 @@ var step_move_count: int = 0
 var step_attack_count: int = 0
 var exe_skill_stats: Dictionary = {}
 
-var attack_queue: Array[int] = []
-var attack_queue_highlighted: int = -1
-
 var skill_slots: Array = []
-var skill_slot_sources: Array = []
 var skill_preview: int = -1
+var synthesis: VectorSynthesisState = VectorSynthesisState.new()
 var kill_count: int = 0
 var shield_spawn_turn: Dictionary = {}
 var enemy_spawn_turn: Dictionary = {}
@@ -71,11 +62,8 @@ var _board_rows: int = ROWS
 var _debug_skill_slot_override: int = -1
 var _guard_quadrant_counts: Array = [0, 0, 0, 0]
 var _guard_active_quadrant: int = -1
-var rdr_pending_is_attack: bool = false
-var rdr_followup_attack_available: bool = false
 
 const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
-const _RDR_SCRIPT = preload("res://scripts/CharacterImpl_RDR.gd")
 
 var cell_nodes: Array[Array] = []
 var _cell_scene: PackedScene = null
@@ -210,13 +198,9 @@ class ArrowOverlay extends Node2D:
 		draw_line(corner, corner + Vector2(0.0, mark_len * v_dir), mark_color, 5.0, true)
 
 func _load_char_config() -> void:
-	char_config = ([_EXE_SCRIPT, _RDR_SCRIPT][_char_index]).get_config()
+	char_config = _EXE_SCRIPT.get_config()
 	if _debug_skill_slot_override > 0:
 		char_config.skill_slot_count = _debug_skill_slot_override
-
-func switch_character() -> void:
-	_char_index = (_char_index + 1) % 2
-	restart()
 
 func toggle_debug_skill_slots() -> void:
 	_debug_skill_slot_override = -1 if _debug_skill_slot_override > 0 else 8
@@ -312,13 +296,6 @@ func restart() -> void:
 		grid.append(row)
 		polluted_grid.append(polluted_row)
 	player_pos = Vector2i(_board_cols / 2, _board_rows / 2)
-	action_seq.clear()
-	action_seq_is_attack.clear()
-	action_seq_used_for_space.clear()
-	exe_pending_attack_slot = -1
-	rdr_pending_vector = CharacterData.Direction.NONE
-	rdr_pending_is_attack = false
-	rdr_followup_attack_available = false
 	moves_this_turn = 0
 	attacks_this_turn = 0
 	bonus_moves = 0
@@ -329,14 +306,12 @@ func restart() -> void:
 	step_move_count = 0
 	step_attack_count = 0
 	_reset_exe_skill_stats()
-	attack_queue.clear()
-	attack_queue_highlighted = -1
 	skill_slots.resize(char_config.skill_slot_count)
-	skill_slot_sources.resize(char_config.skill_slot_count)
 	for i: int in char_config.skill_slot_count:
 		skill_slots[i] = []
-		skill_slot_sources[i] = []
 	skill_preview = -1
+	synthesis.reset(char_config.skill_slot_count)
+	_sync_exe_skill_slots()
 	kill_count = 0
 	shield_spawn_turn.clear()
 	enemy_spawn_turn.clear()
@@ -357,14 +332,45 @@ func is_polluted(pos: Vector2i) -> bool:
 func can_accept_input() -> bool:
 	return not game_over
 
-func can_combine_skill() -> bool:
+func _sync_exe_skill_slots() -> void:
+	skill_slots = synthesis.legacy_slots()
+	skill_preview = synthesis.selected_slot
+
+func _slot_data(slot: int) -> Array:
+	if slot < 0 or slot >= char_config.skill_slot_count:
+		return []
+	return synthesis.legacy_slot(slot)
+
+func get_selected_skill_slot() -> int:
+	return synthesis.selected_slot
+
+func is_skill_slot_complete(slot: int) -> bool:
+	return _slot_data(slot).size() == 3
+
+func _synthesis_slot_sizes() -> Array[int]:
+	var sizes: Array[int] = []
+	for slot_data: Array in synthesis.slots:
+		sizes.append(slot_data.size())
+	return sizes
+
+func _record_new_exe_syntheses(before_sizes: Array[int]) -> void:
+	for i: int in synthesis.slots.size():
+		if i < before_sizes.size() and before_sizes[i] < 2 and synthesis.slots[i].size() == 2:
+			_record_exe_skill_synthesis(synthesis.legacy_slot(i))
+
+func _auto_store_exe_pending() -> bool:
+	if not synthesis.has_pending():
+		return true
+	var before_sizes: Array[int] = _synthesis_slot_sizes()
+	if not synthesis.auto_store_pending():
+		return false
+	_sync_exe_skill_slots()
+	_record_new_exe_syntheses(before_sizes)
+	_record_slot_usage_sample()
 	return true
 
-func has_rdr_followup_attack() -> bool:
-	return rdr_followup_attack_available
-
-func clear_rdr_followup_attack() -> void:
-	rdr_followup_attack_available = false
+func can_combine_skill() -> bool:
+	return true
 
 func is_basic_move_legal(from: Vector2i, dir: int, state: Dictionary = {}) -> bool:
 	var target: Vector2i = from + CharacterData.DIR_VECTOR[dir]
@@ -376,21 +382,15 @@ func is_basic_move_legal(from: Vector2i, dir: int, state: Dictionary = {}) -> bo
 func try_move(dir: int) -> bool:
 	if game_over:
 		return false
-	if not _resolve_exe_pending_attack_default():
-		return false
-	if not _resolve_rdr_pending_default():
-		return false
-	if not char_config.use_exe_manual_slotting and action_seq.size() >= char_config.seq_slots:
+	if not _auto_store_exe_pending():
 		return false
 	if moves_this_turn >= char_config.max_moves + bonus_moves:
 		return false
 	if not is_basic_move_legal(player_pos, dir):
 		return false
 	player_pos += CharacterData.DIR_VECTOR[dir]
-	if char_config.use_rdr_classifier:
-		_record_rdr_vector(dir, false)
-	else:
-		_append_action_step(dir, false)
+	synthesis.record_move(dir)
+	_sync_exe_skill_slots()
 	moves_this_turn += 1
 	_record_step_stats(true, false)
 	_refresh_visuals()
@@ -399,13 +399,9 @@ func try_move(dir: int) -> bool:
 func try_attack(dir: int) -> bool:
 	if game_over:
 		return false
-	if not _resolve_exe_pending_attack_default():
-		return false
-	if not _resolve_rdr_pending_default():
+	if not _auto_store_exe_pending():
 		return false
 	if is_polluted(player_pos):
-		return false
-	if not char_config.use_exe_manual_slotting and action_seq.size() >= char_config.seq_slots:
 		return false
 	if attacks_this_turn >= char_config.max_attacks + bonus_attacks:
 		return false
@@ -425,40 +421,10 @@ func try_attack(dir: int) -> bool:
 		if char_config.teleport_on_kill:
 			player_pos = target
 	var killed: bool = grid[target.y][target.x] == CharacterData.CellType.LIVE
-	if char_config.use_exe_manual_slotting and killed:
-		_record_exe_attack_vector(dir)
-	elif char_config.use_rdr_classifier and killed:
-		_record_rdr_vector(dir, true)
-	elif not char_config.use_rdr_classifier or killed:
-		_append_action_step(dir, true)
-	attacks_this_turn += 1
-	_record_step_stats(false, true)
-	_refresh_visuals()
-	return true
-
-func try_rdr_followup_attack(dir: int) -> bool:
-	if game_over or not rdr_followup_attack_available:
-		return false
-	rdr_followup_attack_available = false
-	var target: Vector2i = player_pos + CharacterData.DIR_VECTOR[dir]
-	if not _in_bounds(target):
-		_refresh_visuals()
-		return false
-	if not CharacterData.is_enemy(grid[target.y][target.x]):
-		_refresh_visuals()
-		return false
-	var shield_dir: int = CharacterData.get_shield_dir(grid[target.y][target.x])
-	if shield_dir != CharacterData.Direction.NONE \
-	and CharacterData.DIR_VECTOR[dir] + CharacterData.DIR_VECTOR[shield_dir] == Vector2i.ZERO:
-		if not CharacterData.is_hard_shield(grid[target.y][target.x]):
-			grid[target.y][target.x] = CharacterData.CellType.ENEMY
-	else:
-		_clear_enemy(target)
-		if char_config.teleport_on_kill:
-			player_pos = target
-	var killed: bool = grid[target.y][target.x] == CharacterData.CellType.LIVE
 	if killed:
-		_record_rdr_vector(dir, true)
+		synthesis.record_attack_kill(dir)
+		_sync_exe_skill_slots()
+	attacks_this_turn += 1
 	_record_step_stats(false, true)
 	_refresh_visuals()
 	return true
@@ -466,46 +432,9 @@ func try_rdr_followup_attack(dir: int) -> bool:
 func try_end_turn() -> bool:
 	if game_over:
 		return false
-	if not _resolve_exe_pending_attack_default():
+	if not _auto_store_exe_pending():
 		return false
-	_clear_rdr_pending_vector()
-	clear_rdr_followup_attack()
-	if char_config.use_unified_slots and not char_config.use_rdr_classifier and not char_config.use_exe_manual_slotting:
-		var new_attacks: Array[int] = []
-		for i: int in action_seq.size():
-			if action_seq_is_attack[i]:
-				new_attacks.append(action_seq[i])
-		var empty_indices: Array[int] = []
-		var vector_indices: Array[int] = []
-		for i: int in char_config.skill_slot_count:
-			if skill_slots[i].size() == 0:
-				empty_indices.append(i)
-			elif skill_slots[i].size() == 1:
-				vector_indices.append(i)
-		while new_attacks.size() > empty_indices.size() + vector_indices.size():
-			new_attacks.pop_front()
-		var fill_idx: int = 0
-		for i: int in empty_indices:
-			if fill_idx >= new_attacks.size():
-				break
-			skill_slots[i] = [new_attacks[fill_idx]]
-			fill_idx += 1
-		for i: int in vector_indices:
-			if fill_idx >= new_attacks.size():
-				break
-			skill_slots[i] = [new_attacks[fill_idx]]
-			fill_idx += 1
-	else:
-		for i: int in action_seq.size():
-			if action_seq_is_attack[i]:
-				attack_queue.append(action_seq[i])
-		while attack_queue.size() > char_config.attack_queue_cap:
-			attack_queue.pop_front()
-
 	turn += 1
-	action_seq.clear()
-	action_seq_is_attack.clear()
-	action_seq_used_for_space.clear()
 	moves_this_turn = 0
 	attacks_this_turn = 0
 	bonus_moves = 0
@@ -524,7 +453,7 @@ func try_end_turn() -> bool:
 
 func _count_occupied_skill_slots() -> int:
 	var occupied: int = 0
-	for slot_data: Array in skill_slots:
+	for slot_data: Array in synthesis.legacy_slots():
 		if not slot_data.is_empty():
 			occupied += 1
 	return occupied
@@ -575,7 +504,7 @@ func _exe_skill_stat_key(stype: int) -> String:
 			return ""
 
 func _record_exe_skill_synthesis(slot_data: Array) -> void:
-	if not char_config.use_exe_manual_slotting or slot_data.size() != 3:
+	if slot_data.size() != 3:
 		return
 	var key: String = _exe_skill_stat_key(_classify(slot_data))
 	if key.is_empty():
@@ -585,7 +514,7 @@ func _record_exe_skill_synthesis(slot_data: Array) -> void:
 	exe_skill_stats[key] = stats
 
 func _record_exe_skill_cast(slot_data: Array, kills: int, recovery: int) -> void:
-	if not char_config.use_exe_manual_slotting or slot_data.size() != 3:
+	if slot_data.size() != 3:
 		return
 	var key: String = _exe_skill_stat_key(_classify(slot_data))
 	if key.is_empty():
@@ -603,272 +532,22 @@ func _get_total_exe_skill_syntheses() -> int:
 		total += int(stats.get("synth", 0))
 	return total
 
-func set_atk_highlight(slot: int) -> void:
-	attack_queue_highlighted = -1 if attack_queue_highlighted == slot else slot
-	queue_redraw()
-
 func try_combine_skill() -> bool:
 	if game_over:
 		return false
 	if not can_combine_skill():
 		return false
-	if char_config.use_unified_slots:
-		return _try_combine_skill_unified()
-	if char_config.skill_mixed:
-		return _try_combine_skill_mixed()
-	if attack_queue_highlighted < 0 or attack_queue_highlighted >= attack_queue.size():
-		return false
-	if action_seq.is_empty():
-		return false
-	var dir_seq: int = action_seq[-1]
-	var dir_atk: int = attack_queue[attack_queue_highlighted]
-	if CharacterData.DIR_VECTOR[dir_seq] + CharacterData.DIR_VECTOR[dir_atk] == Vector2i.ZERO:
-		return false
-	var empty: int = -1
-	for i: int in char_config.skill_slot_count:
-		if skill_slots[i].is_empty():
-			empty = i
-			break
-	if empty < 0:
-		return false
-	skill_slots[empty] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
-	attack_queue.remove_at(attack_queue_highlighted)
-	attack_queue_highlighted = -1
-	_record_slot_usage_sample()
-	_refresh_visuals()
-	return true
-
-func _try_combine_skill_unified() -> bool:
-	if char_config.use_rdr_classifier:
-		return _try_store_rdr_skill_vector()
-	if char_config.use_exe_manual_slotting:
-		return _try_store_exe_skill_component()
-	var slot_index: int = skill_preview
-	if slot_index < 0 or slot_index >= char_config.skill_slot_count or skill_slots[slot_index].size() != 1:
-		slot_index = -1
-		for i: int in char_config.skill_slot_count:
-			if skill_slots[i].size() == 1:
-				slot_index = i
-				break
-	if slot_index < 0:
-		return false
-	if action_seq.is_empty():
-		return false
-	var dir_seq: int = action_seq[-1]
-	var dir_atk: int = skill_slots[slot_index][0]
-	if CharacterData.DIR_VECTOR[dir_seq] + CharacterData.DIR_VECTOR[dir_atk] == Vector2i.ZERO:
-		return false
-	skill_slots[slot_index] = [dir_seq, dir_atk, action_seq_is_attack[-1]]
-	_record_slot_usage_sample()
-	_refresh_visuals()
-	return true
-
-func _try_store_rdr_skill_vector() -> bool:
-	if rdr_pending_vector == CharacterData.Direction.NONE:
-		return false
-	var slot_index: int = skill_preview
-	if slot_index >= 0 and slot_index < char_config.skill_slot_count:
-		if not _can_store_rdr_vector_in_slot(skill_slots[slot_index], rdr_pending_vector):
-			return false
-	else:
-		slot_index = -1
-		for i: int in char_config.skill_slot_count:
-			if skill_slots[i].is_empty():
-				slot_index = i
-				break
-		if slot_index < 0:
-			for i: int in char_config.skill_slot_count:
-				if _can_store_rdr_vector_in_slot(skill_slots[i], rdr_pending_vector):
-					slot_index = i
-					break
-	if slot_index < 0:
-		return false
-	_store_rdr_vector_in_slot(slot_index, rdr_pending_vector, rdr_pending_is_attack)
-	rdr_pending_vector = CharacterData.Direction.NONE
-	rdr_pending_is_attack = false
-	_record_slot_usage_sample()
-	_refresh_visuals()
-	return true
-
-func _record_rdr_vector(dir_seq: int, is_attack: bool) -> void:
-	if not _has_rdr_partial_slot():
-		var empty_slot: int = _first_empty_skill_slot()
-		if empty_slot >= 0:
-			skill_slots[empty_slot] = [dir_seq]
-			skill_slot_sources[empty_slot] = [is_attack]
-			_record_slot_usage_sample()
-			return
-	rdr_pending_vector = dir_seq
-	rdr_pending_is_attack = is_attack
-
-func _resolve_rdr_pending_default() -> bool:
-	if not char_config.use_rdr_classifier:
-		return true
-	if rdr_pending_vector == CharacterData.Direction.NONE:
-		return true
-	var empty_slot: int = _first_empty_skill_slot()
-	if empty_slot >= 0:
-		skill_slots[empty_slot] = [rdr_pending_vector]
-		skill_slot_sources[empty_slot] = [rdr_pending_is_attack]
-		rdr_pending_vector = CharacterData.Direction.NONE
-		rdr_pending_is_attack = false
-		_record_slot_usage_sample()
-		return true
-	for i: int in char_config.skill_slot_count:
-		if _can_store_rdr_vector_in_slot(skill_slots[i], rdr_pending_vector):
-			_store_rdr_vector_in_slot(i, rdr_pending_vector, rdr_pending_is_attack)
-			rdr_pending_vector = CharacterData.Direction.NONE
-			rdr_pending_is_attack = false
-			_record_slot_usage_sample()
-			return true
-	return false
-
-func _clear_rdr_pending_vector() -> void:
-	rdr_pending_vector = CharacterData.Direction.NONE
-	rdr_pending_is_attack = false
-
-func _has_rdr_partial_slot() -> bool:
-	for slot_data: Array in skill_slots:
-		if slot_data.size() == 1:
-			return true
-	return false
-
-func _can_store_rdr_vector_in_slot(slot_data: Array, dir_seq: int) -> bool:
-	if slot_data.is_empty():
-		return true
-	if slot_data.size() != 1:
-		return false
-	var dir_prev: int = slot_data[0]
-	return CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] != Vector2i.ZERO
-
-func _store_rdr_vector_in_slot(slot_index: int, dir_seq: int, is_attack: bool) -> void:
-	var slot_data: Array = skill_slots[slot_index]
-	if slot_data.is_empty():
-		skill_slots[slot_index] = [dir_seq]
-		skill_slot_sources[slot_index] = [is_attack]
-	elif slot_data.size() == 1:
-		var dir_prev: int = slot_data[0]
-		skill_slots[slot_index] = [dir_prev, dir_seq, false]
-		var sources: Array = skill_slot_sources[slot_index]
-		var prev_is_attack: bool = sources[0] if sources.size() > 0 else false
-		skill_slot_sources[slot_index] = [prev_is_attack, is_attack]
+	return _try_store_exe_skill_component()
 
 func _try_store_exe_skill_component() -> bool:
-	if exe_pending_attack_slot >= 0:
-		return _resolve_exe_pending_attack_with_space()
-	if action_seq.is_empty():
+	var before_sizes: Array[int] = _synthesis_slot_sizes()
+	if not synthesis.press_space():
 		return false
-	var used_index: int = action_seq.size() - 1
-	if used_index < 0 or used_index >= action_seq_used_for_space.size() or action_seq_used_for_space[used_index]:
-		return false
-	var dir_seq: int = action_seq[-1]
-	var latest_is_attack: bool = action_seq_is_attack[used_index]
-	var slot_index: int = skill_preview
-	if slot_index >= 0 and slot_index < char_config.skill_slot_count:
-		if not _can_store_exe_skill_component(skill_slots[slot_index], dir_seq, latest_is_attack):
-			return false
-	else:
-		slot_index = _find_exe_skill_slot(dir_seq, latest_is_attack)
-		if slot_index < 0:
-			return false
-	var slot_data: Array = skill_slots[slot_index]
-	if slot_data.is_empty():
-		skill_slots[slot_index] = [dir_seq]
-		action_seq.remove_at(used_index)
-		action_seq_is_attack.remove_at(used_index)
-		action_seq_used_for_space.remove_at(used_index)
-	elif slot_data.size() == 1:
-		var dir_prev: int = slot_data[0]
-		skill_slots[slot_index] = [dir_seq, dir_prev, latest_is_attack]
-		_record_exe_skill_synthesis(skill_slots[slot_index])
-		action_seq_used_for_space[used_index] = true
-	else:
-		return false
+	_sync_exe_skill_slots()
+	_record_new_exe_syntheses(before_sizes)
 	_record_slot_usage_sample()
 	_refresh_visuals()
 	return true
-
-func _record_exe_attack_vector(dir_seq: int) -> void:
-	var empty_slot: int = _first_empty_skill_slot()
-	if empty_slot >= 0 and _has_existing_exe_attack_record():
-		_append_action_step(dir_seq, true)
-		exe_pending_attack_slot = empty_slot
-		return
-	if empty_slot >= 0:
-		skill_slots[empty_slot] = [dir_seq]
-		return
-	_append_action_step(dir_seq, true)
-
-func _resolve_exe_pending_attack_default() -> bool:
-	if exe_pending_attack_slot < 0:
-		return true
-	if exe_pending_attack_slot >= char_config.skill_slot_count:
-		exe_pending_attack_slot = -1
-		return false
-	var used_index: int = action_seq.size() - 1
-	if used_index < 0 or not action_seq_is_attack[used_index]:
-		exe_pending_attack_slot = -1
-		return true
-	if not skill_slots[exe_pending_attack_slot].is_empty():
-		exe_pending_attack_slot = -1
-		return false
-	skill_slots[exe_pending_attack_slot] = [action_seq[used_index]]
-	action_seq.remove_at(used_index)
-	action_seq_is_attack.remove_at(used_index)
-	action_seq_used_for_space.remove_at(used_index)
-	exe_pending_attack_slot = -1
-	return true
-
-func _resolve_exe_pending_attack_with_space() -> bool:
-	var used_index: int = action_seq.size() - 1
-	if used_index < 0 or not action_seq_is_attack[used_index]:
-		exe_pending_attack_slot = -1
-		return false
-	var dir_seq: int = action_seq[used_index]
-	var slot_index: int = skill_preview
-	if slot_index >= 0 and slot_index < char_config.skill_slot_count and skill_slots[slot_index].size() == 1:
-		var dir_prev: int = skill_slots[slot_index][0]
-		if CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] == Vector2i.ZERO:
-			return false
-		skill_slots[slot_index] = [dir_seq, dir_prev, true]
-		_record_exe_skill_synthesis(skill_slots[slot_index])
-		action_seq.remove_at(used_index)
-		action_seq_is_attack.remove_at(used_index)
-		action_seq_used_for_space.remove_at(used_index)
-		exe_pending_attack_slot = -1
-		_refresh_visuals()
-		return true
-	if not _resolve_exe_pending_attack_default():
-		return false
-	_refresh_visuals()
-	return true
-
-func _first_empty_skill_slot() -> int:
-	for i: int in char_config.skill_slot_count:
-		if skill_slots[i].is_empty():
-			return i
-	return -1
-
-func _append_action_step(dir_seq: int, is_attack: bool) -> void:
-	if char_config.use_exe_manual_slotting:
-		while action_seq.size() >= char_config.seq_slots:
-			action_seq.remove_at(0)
-			action_seq_is_attack.remove_at(0)
-			action_seq_used_for_space.remove_at(0)
-	action_seq.append(dir_seq)
-	action_seq_is_attack.append(is_attack)
-	action_seq_used_for_space.append(false)
-
-func _has_existing_exe_attack_record() -> bool:
-	for slot_data: Array in skill_slots:
-		if slot_data.size() == 1:
-			return true
-	for i: int in action_seq.size():
-		if i < action_seq_used_for_space.size() and action_seq_used_for_space[i]:
-			continue
-		if action_seq_is_attack[i]:
-			return true
-	return false
 
 func _draw_dashed_rect_outline(rect: Rect2, color: Color, width: float, dash_len: float, gap_len: float) -> void:
 	var left: float = rect.position.x
@@ -887,69 +566,6 @@ func _draw_dashed_rect_outline(rect: Rect2, color: Color, width: float, dash_len
 		draw_line(Vector2(left, y), Vector2(left, seg_end_y), color, width, true)
 		draw_line(Vector2(right, y), Vector2(right, seg_end_y), color, width, true)
 		y += dash_len + gap_len
-
-func _get_exe_latest_move_index() -> int:
-	for i: int in range(action_seq.size() - 1, -1, -1):
-		var is_pending_attack: bool = exe_pending_attack_slot >= 0 and i == action_seq.size() - 1 and i < action_seq_is_attack.size() and action_seq_is_attack[i]
-		if is_pending_attack:
-			continue
-		if i < action_seq_is_attack.size() and not action_seq_is_attack[i]:
-			if i < action_seq_used_for_space.size() and action_seq_used_for_space[i]:
-				return -1
-			return i
-	return -1
-
-func _get_exe_temp_attack_index() -> int:
-	if exe_pending_attack_slot >= 0 and not action_seq.is_empty():
-		var pending_index: int = action_seq.size() - 1
-		if pending_index < action_seq_is_attack.size() and action_seq_is_attack[pending_index]:
-			return pending_index
-	for i: int in range(action_seq.size() - 1, -1, -1):
-		if i < action_seq_is_attack.size() and action_seq_is_attack[i]:
-			if i < action_seq_used_for_space.size() and action_seq_used_for_space[i]:
-				return -1
-			return i
-	return -1
-
-func _find_exe_skill_slot(dir_seq: int, latest_is_attack: bool) -> int:
-	if latest_is_attack:
-		for i: int in char_config.skill_slot_count:
-			if skill_slots[i].is_empty():
-				return i
-	for i: int in char_config.skill_slot_count:
-		if _can_store_exe_skill_component(skill_slots[i], dir_seq, latest_is_attack):
-			return i
-	return -1
-
-func _can_store_exe_skill_component(slot_data: Array, dir_seq: int, latest_is_attack: bool) -> bool:
-	if slot_data.size() >= 3:
-		return false
-	if slot_data.is_empty():
-		return latest_is_attack
-	if slot_data.size() != 1:
-		return false
-	var dir_prev: int = slot_data[0]
-	if CharacterData.DIR_VECTOR[dir_prev] + CharacterData.DIR_VECTOR[dir_seq] == Vector2i.ZERO:
-		return false
-	return true
-
-func _try_combine_skill_mixed() -> bool:
-	if action_seq.size() < 2:
-		return false
-	var dir1: int = action_seq[-2]
-	var dir2: int = action_seq[-1]
-	if CharacterData.DIR_VECTOR[dir1] + CharacterData.DIR_VECTOR[dir2] == Vector2i.ZERO:
-		return false
-	var empty: int = -1
-	for i: int in char_config.skill_slot_count:
-		if skill_slots[i].is_empty():
-			empty = i
-			break
-	if empty < 0:
-		return false
-	skill_slots[empty] = [dir1, dir2, false]
-	_refresh_visuals()
-	return true
 
 func _spawn_order(seed: int) -> Array[Vector2i]:
 	var all: Array[Vector2i] = []
@@ -1188,150 +804,58 @@ func _draw() -> void:
 	var skill_font_size: int = 26
 	var exe_slot_x0: float = 0.0
 	var exe_slot_y: float = base_ui_y
-	if char_config.use_unified_slots:
-		var slot_count: int = char_config.skill_slot_count
-		var total_slot_w: float = (slot_count - 1) * SEQ_STEP + SEQ_SIZE
-		var slot_x0: float = (board_w - total_slot_w) / 2.0
-		if char_config.use_exe_manual_slotting or char_config.use_rdr_classifier:
-			slot_x0 += 24.0
-		var slot_y: float = base_ui_y
-		exe_slot_x0 = slot_x0
-		exe_slot_y = slot_y
-		seq_y = slot_y + SEQ_SIZE + ATK_QUEUE_GAP
-		for i: int in slot_count:
-			var sx: float = slot_x0 + i * SEQ_STEP
-			var srect: Rect2 = Rect2(sx, slot_y, SEQ_SIZE, SEQ_SIZE)
-			var is_armed: bool = skill_preview == i
-			var slot_data: Array = skill_slots[i]
-			var is_exe_pending_slot: bool = char_config.use_exe_manual_slotting and i == exe_pending_attack_slot
-			if slot_data.size() == 3:
-				draw_rect(srect, Color(0.08, 0.08, 0.18))
-				draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.35, 0.35, 0.65),
-					false, 2.5 if is_armed else 1.5)
-				var stext_y: float = slot_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0 - 8.0
-				var half: float = SEQ_SIZE / 2.0
-				var col_a: Color = Color(1.0, 0.6, 0.15) if slot_data[2] else Color.WHITE
-				var col_b: Color = Color(1.0, 0.6, 0.15)
-				if char_config.use_rdr_classifier and i < skill_slot_sources.size():
-					var slot_sources: Array = skill_slot_sources[i]
-					col_a = Color(1.0, 0.6, 0.15) if slot_sources.size() > 0 and slot_sources[0] else Color.WHITE
-					col_b = Color(1.0, 0.6, 0.15) if slot_sources.size() > 1 and slot_sources[1] else Color.WHITE
-				draw_string(font, Vector2(sx, stext_y), CharacterData.DIR_ARROWS[slot_data[0]],
-					HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_a)
-				draw_string(font, Vector2(sx + half, stext_y), CharacterData.DIR_ARROWS[slot_data[1]],
-					HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_b)
-				var stype: int = _classify(slot_data)
-				draw_string(font, Vector2(sx, slot_y + SEQ_SIZE - 2.0),
-					CharacterData.SKILL_TYPE_NAMES[stype],
-					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
-			elif slot_data.size() == 1:
-				draw_rect(srect, Color(0.16, 0.09, 0.04) if is_armed else Color(0.10, 0.10, 0.13))
-				draw_rect(srect, Color(1.0, 0.6, 0.15) if is_armed else Color(0.40, 0.25, 0.08),
-					false, 2.5 if is_armed else 1.5)
-				var atk_text_y: float = slot_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-				var single_col: Color = Color(1.0, 0.6, 0.15)
-				if char_config.use_rdr_classifier and i < skill_slot_sources.size():
-					var single_sources: Array = skill_slot_sources[i]
-					single_col = Color(1.0, 0.6, 0.15) if single_sources.size() > 0 and single_sources[0] else Color.WHITE
-				draw_string(font, Vector2(sx, atk_text_y), CharacterData.DIR_ARROWS[slot_data[0]],
-					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, single_col)
-			elif is_exe_pending_slot and not action_seq.is_empty():
-				draw_rect(srect, Color(0.10, 0.10, 0.13))
+	var slot_count: int = char_config.skill_slot_count
+	var total_slot_w: float = (slot_count - 1) * SEQ_STEP + SEQ_SIZE
+	var slot_x0: float = (board_w - total_slot_w) / 2.0 + 24.0
+	var slot_y: float = base_ui_y
+	exe_slot_x0 = slot_x0
+	exe_slot_y = slot_y
+	seq_y = slot_y + SEQ_SIZE + ATK_QUEUE_GAP
+	for i: int in slot_count:
+		var sx: float = slot_x0 + i * SEQ_STEP
+		var srect: Rect2 = Rect2(sx, slot_y, SEQ_SIZE, SEQ_SIZE)
+		var is_armed: bool = skill_preview == i
+		var slot_data: Array = skill_slots[i]
+		var is_pending_slot: bool = synthesis.has_pending() and synthesis.selected_slot == i and synthesis.can_store_in_slot(i)
+		if slot_data.size() == 3:
+			draw_rect(srect, Color(0.08, 0.08, 0.18))
+			draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.35, 0.35, 0.65), false, 2.5 if is_armed else 1.5)
+			var stext_y: float = slot_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0 - 8.0
+			var half: float = SEQ_SIZE / 2.0
+			var col_a: Color = Color(1.0, 0.6, 0.15) if slot_data[2] else Color.WHITE
+			draw_string(font, Vector2(sx, stext_y), CharacterData.DIR_ARROWS[slot_data[0]], HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, col_a)
+			draw_string(font, Vector2(sx + half, stext_y), CharacterData.DIR_ARROWS[slot_data[1]], HORIZONTAL_ALIGNMENT_CENTER, half, skill_font_size, Color(1.0, 0.6, 0.15))
+			draw_string(font, Vector2(sx, slot_y + SEQ_SIZE - 2.0), CharacterData.SKILL_TYPE_NAMES[_classify(slot_data)], HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
+		elif slot_data.size() == 1:
+			draw_rect(srect, Color(0.16, 0.09, 0.04) if is_armed else Color(0.10, 0.10, 0.13))
+			draw_rect(srect, Color(1.0, 0.6, 0.15) if is_armed else Color(0.40, 0.25, 0.08), false, 2.5 if is_armed else 1.5)
+			var single_col: Color = Color(1.0, 0.6, 0.15) if VectorSynthesisState.token_is_attack(synthesis.slots[i][0]) else Color.WHITE
+			var atk_text_y: float = slot_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+			draw_string(font, Vector2(sx, atk_text_y), CharacterData.DIR_ARROWS[slot_data[0]], HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, single_col)
+		else:
+			draw_rect(srect, Color(0.10, 0.10, 0.13))
+			if is_pending_slot:
 				_draw_dashed_rect_outline(srect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
 			else:
-				draw_rect(srect, Color(0.10, 0.10, 0.13))
-				draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.30, 0.30, 0.35),
-					false, 2.5 if is_armed else 1.5)
-	else:
-		var skill_y: float
-		if char_config.skill_mixed:
-			skill_y = base_ui_y
-			seq_y = skill_y + SEQ_SIZE + SKILL_MARGIN_TOP
-		else:
-			skill_y = base_ui_y
-			var atk_slots: int = char_config.attack_queue_cap
-			var total_atk_w: float = (atk_slots - 1) * SEQ_STEP + SEQ_SIZE
-			var atk_x0: float = (board_w - total_atk_w) / 2.0
-			var atk_y: float = skill_y + SEQ_SIZE + SKILL_MARGIN_TOP
-			for i: int in atk_slots:
-				var ax: float = atk_x0 + i * SEQ_STEP
-				var arect: Rect2 = Rect2(ax, atk_y, SEQ_SIZE, SEQ_SIZE)
-				var is_hl: bool = i == attack_queue_highlighted
-				draw_rect(arect, Color(0.16, 0.09, 0.04) if is_hl else Color(0.10, 0.10, 0.13))
-				draw_rect(arect, Color(1.0, 0.6, 0.15) if is_hl else Color(0.40, 0.25, 0.08),
-					false, 2.5 if is_hl else 1.5)
-				if i < attack_queue.size():
-					var atk_arrow: String = CharacterData.DIR_ARROWS[attack_queue[i]]
-					var atk_text_y: float = atk_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-					draw_string(font, Vector2(ax, atk_text_y), atk_arrow,
-						HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color(1.0, 0.6, 0.15))
-			seq_y = atk_y + SEQ_SIZE + ATK_QUEUE_GAP
-		for i: int in char_config.skill_slot_count:
-			var sx: float = i * SEQ_STEP
-			var srect: Rect2 = Rect2(sx, skill_y, SEQ_SIZE, SEQ_SIZE)
-			var is_previewing: bool = skill_preview == i
-			draw_rect(srect, Color(0.08, 0.08, 0.18))
-			draw_rect(srect, Color(0.65, 0.65, 1.0) if is_previewing else Color(0.35, 0.35, 0.65),
-				false, 2.5 if is_previewing else 1.5)
-			if not skill_slots[i].is_empty():
-				var stext_y: float = skill_y + (SEQ_SIZE + skill_font_size * 0.7) / 2.0 - 8.0
-				var half2: float = SEQ_SIZE / 2.0
-				var col_a2: Color = Color(1.0, 0.6, 0.15) if (skill_slots[i].size() > 2 and skill_slots[i][2]) else Color.WHITE
-				draw_string(font, Vector2(sx, stext_y), CharacterData.DIR_ARROWS[skill_slots[i][0]],
-					HORIZONTAL_ALIGNMENT_CENTER, half2, skill_font_size, col_a2)
-				draw_string(font, Vector2(sx + half2, stext_y), CharacterData.DIR_ARROWS[skill_slots[i][1]],
-					HORIZONTAL_ALIGNMENT_CENTER, half2, skill_font_size, Color(1.0, 0.6, 0.15))
-				var stype2: int = _classify(skill_slots[i])
-				draw_string(font, Vector2(sx, skill_y + SEQ_SIZE - 2.0),
-					CharacterData.SKILL_TYPE_NAMES[stype2],
-					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, 13, Color(0.75, 0.75, 1.0))
+				draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.30, 0.30, 0.35), false, 2.5 if is_armed else 1.5)
 
-	if char_config.use_exe_manual_slotting:
-		var temp_x: float = exe_slot_x0 - SEQ_STEP
-		var action_x: float = seq_x0
-		var temp_size: float = SEQ_SIZE + 10.0
-		var temp_rect: Rect2 = Rect2(temp_x - 5.0, exe_slot_y - 5.0, temp_size, temp_size)
-		var action_rect: Rect2 = Rect2(action_x, seq_y, SEQ_SIZE, SEQ_SIZE)
-		var temp_index: int = _get_exe_temp_attack_index()
-		var move_index: int = _get_exe_latest_move_index()
-		draw_rect(temp_rect, Color(0.10, 0.10, 0.13))
-		draw_rect(action_rect, Color(0.10, 0.10, 0.13))
-		if temp_index >= 0:
-			_draw_dashed_rect_outline(temp_rect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
-			var temp_y: float = temp_rect.position.y + (temp_rect.size.y + font_size * 0.7) / 2.0
-			var temp_col: Color = Color(1.0, 0.72, 0.4, 0.65)
-			draw_string(font, Vector2(temp_rect.position.x, temp_y), CharacterData.DIR_ARROWS[action_seq[temp_index]],
-				HORIZONTAL_ALIGNMENT_CENTER, temp_rect.size.x, font_size, temp_col)
-		if move_index >= 0:
-			draw_rect(action_rect, Color(0.30, 0.30, 0.35), false, 1.5)
-			var move_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-			draw_string(font, Vector2(action_x, move_y), CharacterData.DIR_ARROWS[action_seq[move_index]],
-				HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color.WHITE)
-	elif char_config.use_rdr_classifier:
-		var rdr_temp_x: float = exe_slot_x0 - SEQ_STEP
-		var rdr_temp_size: float = SEQ_SIZE + 10.0
-		var rdr_temp_rect: Rect2 = Rect2(rdr_temp_x - 5.0, exe_slot_y - 5.0, rdr_temp_size, rdr_temp_size)
-		draw_rect(rdr_temp_rect, Color(0.10, 0.10, 0.13))
-		_draw_dashed_rect_outline(rdr_temp_rect, Color(0.65, 0.65, 1.0, 0.75), 2.0, 10.0, 6.0)
-		if rdr_pending_vector != CharacterData.Direction.NONE:
-			var rdr_temp_y: float = rdr_temp_rect.position.y + (rdr_temp_rect.size.y + font_size * 0.7) / 2.0
-			var rdr_pending_col: Color = Color(1.0, 0.72, 0.4, 0.65) if rdr_pending_is_attack else Color(1.0, 1.0, 1.0, 0.65)
-			draw_string(font, Vector2(rdr_temp_rect.position.x, rdr_temp_y), CharacterData.DIR_ARROWS[rdr_pending_vector],
-				HORIZONTAL_ALIGNMENT_CENTER, rdr_temp_rect.size.x, font_size, rdr_pending_col)
-	else:
-		for i: int in slots:
-			var x: float = seq_x0 + i * SEQ_STEP
-			var rect: Rect2 = Rect2(x, seq_y, SEQ_SIZE, SEQ_SIZE)
-			draw_rect(rect, Color(0.10, 0.10, 0.13))
-			var is_hidden_used: bool = i < action_seq_used_for_space.size() and action_seq_used_for_space[i]
-			if not is_hidden_used:
-				draw_rect(rect, Color(0.30, 0.30, 0.35), false, 1.5)
-			if i < action_seq.size() and not is_hidden_used:
-				var arrow: String = CharacterData.DIR_ARROWS[action_seq[i]]
-				var text_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-				var col: Color = Color(1.0, 0.6, 0.15) if action_seq_is_attack[i] else Color.WHITE
-				draw_string(font, Vector2(x, text_y), arrow,
-					HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, col)
+	var temp_x: float = exe_slot_x0 - SEQ_STEP
+	var temp_size: float = SEQ_SIZE + 10.0
+	var temp_rect: Rect2 = Rect2(temp_x - 5.0, exe_slot_y - 5.0, temp_size, temp_size)
+	var action_x: float = seq_x0
+	var action_rect: Rect2 = Rect2(action_x, seq_y, SEQ_SIZE, SEQ_SIZE)
+	draw_rect(temp_rect, Color(0.10, 0.10, 0.13))
+	draw_rect(action_rect, Color(0.10, 0.10, 0.13))
+	if synthesis.pending_attack_token != VectorSynthesisState.NO_TOKEN:
+		_draw_dashed_rect_outline(temp_rect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
+		var temp_y: float = temp_rect.position.y + (temp_rect.size.y + font_size * 0.7) / 2.0
+		draw_string(font, Vector2(temp_rect.position.x, temp_y), CharacterData.DIR_ARROWS[VectorSynthesisState.token_board_dir(synthesis.pending_attack_token)],
+			HORIZONTAL_ALIGNMENT_CENTER, temp_rect.size.x, font_size, Color(1.0, 0.72, 0.4, 0.65))
+	if synthesis.pending_move_token != VectorSynthesisState.NO_TOKEN:
+		draw_rect(action_rect, Color(0.30, 0.30, 0.35), false, 1.5)
+		var move_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
+		draw_string(font, Vector2(action_x, move_y), CharacterData.DIR_ARROWS[VectorSynthesisState.token_board_dir(synthesis.pending_move_token)],
+			HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color.WHITE)
 
 	var bottom_stat_x: float = 8.0
 	var bottom_stat_y: float = seq_y + SEQ_SIZE + 30.0
@@ -1373,30 +897,29 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
 	draw_string(font, Vector2(side_x, 466.0), "%.0f%%" % (move_usage_ratio * 100.0),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.85, 0.95, 1.0))
-	if char_config.use_exe_manual_slotting:
-		var total_synth: int = _get_total_exe_skill_syntheses()
-		draw_string(font, Vector2(side_x, 506.0), "EXE SKILL",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-		draw_string(font, Vector2(side_x, 530.0), "SKL S% K R%",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.7, 0.75))
-		for i: int in EXE_STAT_KEYS.size():
-			var key: String = EXE_STAT_KEYS[i]
-			var stats: Dictionary = exe_skill_stats.get(key, {})
-			var synth: int = int(stats.get("synth", 0))
-			var cast: int = int(stats.get("cast", 0))
-			var kills: int = int(stats.get("kills", 0))
-			var recovery: int = int(stats.get("recovery", 0))
-			var synth_pct: int = 0 if total_synth <= 0 else int(round(float(synth) * 100.0 / float(total_synth)))
-			var avg_kills: float = 0.0 if cast <= 0 else float(kills) / float(cast)
-			var recovery_pct: int = 0 if cast <= 0 else int(round(float(recovery) * 50.0 / float(cast)))
-			var row_text: String = "%s %2d %.1f %2d" % [
-				EXE_STAT_LABELS[key],
-				synth_pct,
-				avg_kills,
-				recovery_pct,
-			]
-			draw_string(font, Vector2(side_x, 552.0 + i * 18.0), row_text,
-				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.9, 0.9, 0.95))
+	var total_synth: int = _get_total_exe_skill_syntheses()
+	draw_string(font, Vector2(side_x, 506.0), "EXE SKILL",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+	draw_string(font, Vector2(side_x, 530.0), "SKL S% K R%",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.7, 0.75))
+	for i: int in EXE_STAT_KEYS.size():
+		var key: String = EXE_STAT_KEYS[i]
+		var stats: Dictionary = exe_skill_stats.get(key, {})
+		var synth: int = int(stats.get("synth", 0))
+		var cast: int = int(stats.get("cast", 0))
+		var kills: int = int(stats.get("kills", 0))
+		var recovery: int = int(stats.get("recovery", 0))
+		var synth_pct: int = 0 if total_synth <= 0 else int(round(float(synth) * 100.0 / float(total_synth)))
+		var avg_kills: float = 0.0 if cast <= 0 else float(kills) / float(cast)
+		var recovery_pct: int = 0 if cast <= 0 else int(round(float(recovery) * 50.0 / float(cast)))
+		var row_text: String = "%s %2d %.1f %2d" % [
+			EXE_STAT_LABELS[key],
+			synth_pct,
+			avg_kills,
+			recovery_pct,
+		]
+		draw_string(font, Vector2(side_x, 552.0 + i * 18.0), row_text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.9, 0.9, 0.95))
 	if game_over:
 		draw_rect(Rect2(-14.0, -14.0, board_w + 160.0, _board_rows * CELL_STEP + 30.0), Color(0, 0, 0, 0.35))
 		draw_string(font, Vector2(board_w * 0.15, _board_rows * CELL_STEP * 0.48), "FAILED",
@@ -1406,17 +929,11 @@ func _draw() -> void:
 
 func _update_board_offset() -> void:
 	var board_w: float = (_board_cols - 1) * CELL_STEP + CELL_SIZE
-	var total_h: float
-	if char_config != null and char_config.use_unified_slots:
-		total_h = _board_rows * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE
-	else:
-		total_h = _board_rows * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE + SKILL_MARGIN_TOP + SEQ_SIZE
+	var total_h: float = _board_rows * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE
 	var vp: Vector2 = get_viewport_rect().size
 	position = Vector2((vp.x - board_w) / 2.0, (vp.y - total_h) / 2.0)
 
 func _classify(slot_data: Array) -> int:
-	if char_config.use_rdr_classifier:
-		return CharacterData.classify_skill_rdr(slot_data)
 	return CharacterData.classify_skill(slot_data)
 
 func _in_bounds(p: Vector2i) -> bool:
@@ -1493,9 +1010,9 @@ func _hit_cell(p: Vector2i, attack_dir: int) -> void:
 
 func get_skill_preview_cells(slot: int) -> Dictionary:
 	var result: Dictionary = {"move": [], "hit": []}
-	if slot < 0 or slot >= char_config.skill_slot_count or skill_slots[slot].size() != 3:
+	var slot_data: Array = _slot_data(slot)
+	if slot < 0 or slot >= char_config.skill_slot_count or slot_data.size() != 3:
 		return result
-	var slot_data: Array = skill_slots[slot]
 	var stype: int = _classify(slot_data)
 	var dv_seq: Vector2i = CharacterData.DIR_VECTOR[slot_data[0]]
 	var dv_atk: Vector2i = CharacterData.DIR_VECTOR[slot_data[1]]
@@ -1517,47 +1034,23 @@ func get_skill_preview_cells(slot: int) -> Dictionary:
 				result["hit"].append(pos + dv_seq)
 			if _in_bounds(pos + dv_atk):
 				result["hit"].append(pos + dv_atk)
-		CharacterData.SkillType.RDR_DASH:
-			var dash_mid: Vector2i = pos + dv_seq
-			var dash_target: Vector2i = pos + 2 * dv_seq
-			result["move"].append(dash_target)
-			var dash_sources: Array = _get_skill_slot_sources(slot)
-			if _rdr_sources_both_attack(dash_sources):
-				if _in_bounds(dash_mid):
-					result["hit"].append(dash_mid)
-				if _in_bounds(dash_target):
-					result["hit"].append(dash_target)
-			elif _rdr_landing_attack_dir(slot_data, dash_sources) != CharacterData.Direction.NONE:
-				result["hit"].append(dash_target)
-		CharacterData.SkillType.RDR_DIAG:
-			var diag_sources: Array = _get_skill_slot_sources(slot)
-			if _rdr_sources_both_attack(diag_sources):
-				if _in_bounds(pos + dv_seq):
-					result["hit"].append(pos + dv_seq)
-				if _in_bounds(pos + dv_atk):
-					result["hit"].append(pos + dv_atk)
-				if _in_bounds(pos + dv_seq + dv_atk):
-					result["hit"].append(pos + dv_seq + dv_atk)
-			else:
-				var diag_target: Vector2i = pos + dv_seq + dv_atk
-				result["move"].append(diag_target)
-				if _rdr_landing_attack_dir(slot_data, diag_sources) != CharacterData.Direction.NONE:
-					result["hit"].append(diag_target)
 	return result
 
 func set_skill_preview(slot: int) -> void:
-	if slot >= 0:
-		clear_rdr_followup_attack()
-	skill_preview = slot
+	synthesis.select_slot(slot)
+	_sync_exe_skill_slots()
 	if _arrow_overlay:
 		_arrow_overlay.queue_redraw()
 	queue_redraw()
 
 func rotate_armed_skill(new_dir: int) -> void:
-	var slot: int = skill_preview
-	if slot < 0 or slot >= char_config.skill_slot_count or skill_slots[slot].size() != 3:
+	if not _auto_store_exe_pending():
 		return
-	var data: Array = skill_slots[slot].duplicate()
+	var slot: int = skill_preview
+	var data: Array = _slot_data(slot)
+	if slot < 0 or slot >= char_config.skill_slot_count or data.size() != 3:
+		return
+	data = data.duplicate()
 	var stype: int = _classify(data)
 	if stype == CharacterData.SkillType.SAME_MA or stype == CharacterData.SkillType.SAME_AA:
 		data[0] = new_dir
@@ -1571,16 +1064,6 @@ func rotate_armed_skill(new_dir: int) -> void:
 			if CharacterData.DIR_VECTOR[d] == atk_dv:
 				data[1] = d
 				break
-	elif stype == CharacterData.SkillType.RDR_DASH:
-		data[0] = new_dir
-		data[1] = new_dir
-	elif stype == CharacterData.SkillType.RDR_DIAG:
-		var new_is_h: bool = new_dir == CharacterData.Direction.LEFT or new_dir == CharacterData.Direction.RIGHT
-		var d0_is_h: bool = data[0] == CharacterData.Direction.LEFT or data[0] == CharacterData.Direction.RIGHT
-		if d0_is_h == new_is_h:
-			data[0] = new_dir
-		else:
-			data[1] = new_dir
 	else:
 		var new_is_h2: bool = new_dir == CharacterData.Direction.LEFT or new_dir == CharacterData.Direction.RIGHT
 		var d0_is_h2: bool = data[0] == CharacterData.Direction.LEFT or data[0] == CharacterData.Direction.RIGHT
@@ -1588,16 +1071,17 @@ func rotate_armed_skill(new_dir: int) -> void:
 			data[0] = new_dir
 		else:
 			data[1] = new_dir
-	skill_slots[slot] = data
+	synthesis.replace_complete_slot(slot, data[0], data[1], data[2])
+	_sync_exe_skill_slots()
 	_refresh_visuals()
 
 func use_skill(slot: int) -> void:
 	if game_over:
 		return
-	if slot < 0 or slot >= char_config.skill_slot_count or skill_slots[slot].size() != 3:
+	var slot_data: Array = _slot_data(slot)
+	if slot < 0 or slot >= char_config.skill_slot_count or slot_data.size() != 3:
 		return
-	var cast_skill: Array = skill_slots[slot].duplicate()
-	var cast_sources: Array = _get_skill_slot_sources(slot).duplicate()
+	var cast_skill: Array = slot_data.duplicate()
 	var live_state: Dictionary = {
 		"grid": grid,
 		"polluted_grid": polluted_grid,
@@ -1611,7 +1095,7 @@ func use_skill(slot: int) -> void:
 		"recovered_dirs": [],
 		"player_moved": false,
 	}
-	_apply_skill_to_state(live_state, skill_slots[slot], cast_sources)
+	_apply_skill_to_state(live_state, cast_skill)
 	grid = live_state["grid"]
 	polluted_grid = live_state["polluted_grid"]
 	player_pos = live_state["player_pos"]
@@ -1621,17 +1105,10 @@ func use_skill(slot: int) -> void:
 	guard_control_quadrant = live_state["guard_control_quadrant"]
 	kill_count += int(live_state["kill_delta"])
 	bonus_moves += int(live_state["bonus_moves_delta"])
-	if char_config.use_rdr_classifier and (_rdr_sources_both_move(cast_sources) or _rdr_sources_mixed_move_attack(cast_sources)):
-		if bool(live_state["player_moved"]):
-			rdr_followup_attack_available = true
-	elif char_config.use_rdr_classifier:
-		bonus_attacks += 1
 	_record_exe_skill_cast(cast_skill, int(live_state["kill_delta"]), live_state["recovered_dirs"].size())
-	skill_slots[slot] = []
-	if slot < skill_slot_sources.size():
-		skill_slot_sources[slot] = []
-	if char_config.use_exe_manual_slotting:
-		_apply_recovered_dirs_to_slots(live_state["recovered_dirs"])
+	synthesis.clear_slot(slot)
+	_sync_exe_skill_slots()
+	_apply_recovered_dirs_to_slots(live_state["recovered_dirs"])
 	_record_step_stats(false, true)
 	_refresh_visuals()
 
@@ -1714,8 +1191,6 @@ func _state_hit_cell(state: Dictionary, p: Vector2i, attack_dir: int, award_kill
 			state["bonus_moves_delta"] += 1
 
 func _state_record_recovery_dir(state: Dictionary, attack_dir: int) -> void:
-	if not char_config.use_exe_manual_slotting:
-		return
 	if attack_dir == CharacterData.Direction.NONE:
 		return
 	if not state.has("recovered_dirs"):
@@ -1728,49 +1203,11 @@ func _state_record_recovery_dir(state: Dictionary, attack_dir: int) -> void:
 	recovered_dirs.append(attack_dir)
 
 func _apply_recovered_dirs_to_slots(recovered_dirs: Array) -> void:
-	for dir_id: int in recovered_dirs:
-		var empty_slot: int = _first_empty_skill_slot()
-		if empty_slot < 0:
-			return
-		skill_slots[empty_slot] = [dir_id]
+	if not recovered_dirs.is_empty():
+		synthesis.record_attack_kill(recovered_dirs[0])
+	_sync_exe_skill_slots()
 
-func _get_skill_slot_sources(slot: int) -> Array:
-	if slot < 0 or slot >= skill_slot_sources.size():
-		return []
-	return skill_slot_sources[slot]
-
-func _rdr_sources_both_attack(source_data: Array) -> bool:
-	return source_data.size() >= 2 and bool(source_data[0]) and bool(source_data[1])
-
-func _rdr_sources_both_move(source_data: Array) -> bool:
-	return source_data.size() >= 2 and not bool(source_data[0]) and not bool(source_data[1])
-
-func _rdr_sources_mixed_move_attack(source_data: Array) -> bool:
-	return source_data.size() >= 2 and bool(source_data[0]) != bool(source_data[1])
-
-func _rdr_landing_attack_dir(slot_data: Array, source_data: Array) -> int:
-	if not char_config.use_rdr_classifier or slot_data.size() < 2 or source_data.size() < 2:
-		return CharacterData.Direction.NONE
-	var first_is_attack: bool = bool(source_data[0])
-	var second_is_attack: bool = bool(source_data[1])
-	if first_is_attack == second_is_attack:
-		return CharacterData.Direction.NONE
-	return slot_data[0] if first_is_attack else slot_data[1]
-
-func _apply_rdr_landing_move(state: Dictionary, target: Vector2i, attack_dir: int) -> void:
-	if not _state_in_bounds(target, state):
-		return
-	var kills_before: int = int(state["kill_delta"])
-	if attack_dir != CharacterData.Direction.NONE and _state_cell_is_enemy(state, target):
-		_state_hit_cell(state, target, attack_dir, false)
-		if int(state["kill_delta"]) > kills_before:
-			state["bonus_moves_delta"] += 1
-	if _state_cell_is_enemy(state, target):
-		return
-	state["player_pos"] = target
-	state["player_moved"] = true
-
-func _apply_skill_to_state(state: Dictionary, slot_data: Array, source_data: Array = []) -> void:
+func _apply_skill_to_state(state: Dictionary, slot_data: Array) -> void:
 	var stype: int = _classify(slot_data)
 	var dv_seq: Vector2i = CharacterData.DIR_VECTOR[slot_data[0]]
 	var dv_atk: Vector2i = CharacterData.DIR_VECTOR[slot_data[1]]
@@ -1803,28 +1240,6 @@ func _apply_skill_to_state(state: Dictionary, slot_data: Array, source_data: Arr
 		CharacterData.SkillType.ORTHO_AA:
 			_state_hit_cell(state, pos + dv_seq, slot_data[0])
 			_state_hit_cell(state, pos + dv_atk, slot_data[1])
-		CharacterData.SkillType.RDR_DASH:
-			var mid_cell: Vector2i = pos + dv_seq
-			var end_cell: Vector2i = pos + 2 * dv_seq
-			if _rdr_sources_both_attack(source_data):
-				_state_hit_cell(state, mid_cell, slot_data[0], false)
-				_state_hit_cell(state, end_cell, slot_data[0], false)
-				if _state_in_bounds(end_cell, state) and not _state_cell_is_enemy(state, end_cell):
-					state["player_pos"] = end_cell
-					state["player_moved"] = true
-				elif _state_in_bounds(mid_cell, state) and not _state_cell_is_enemy(state, mid_cell):
-					state["player_pos"] = mid_cell
-					state["player_moved"] = true
-			else:
-				_apply_rdr_landing_move(state, end_cell, _rdr_landing_attack_dir(slot_data, source_data))
-		CharacterData.SkillType.RDR_DIAG:
-			if _rdr_sources_both_attack(source_data):
-				_state_hit_cell(state, pos + dv_seq, slot_data[0], false)
-				_state_hit_cell(state, pos + dv_atk, slot_data[1], false)
-				_state_hit_cell(state, pos + dv_seq + dv_atk, slot_data[0], false)
-			else:
-				var jump_dest: Vector2i = pos + dv_seq + dv_atk
-				_apply_rdr_landing_move(state, jump_dest, _rdr_landing_attack_dir(slot_data, source_data))
 
 func _count_legal_moves_at(pos: Vector2i, state: Dictionary = {}) -> int:
 	var count: int = 0
@@ -1833,7 +1248,7 @@ func _count_legal_moves_at(pos: Vector2i, state: Dictionary = {}) -> int:
 			count += 1
 	return count
 
-func _skill_changes_state(state: Dictionary, skill: Array, source_data: Array = []) -> bool:
+func _skill_changes_state(state: Dictionary, skill: Array) -> bool:
 	var before_pos: Vector2i = state["player_pos"]
 	var sim: Dictionary = {
 		"grid": _duplicate_grid(state["grid"]),
@@ -1848,7 +1263,7 @@ func _skill_changes_state(state: Dictionary, skill: Array, source_data: Array = 
 		"recovered_dirs": [],
 		"player_moved": false,
 	}
-	_apply_skill_to_state(sim, skill, source_data)
+	_apply_skill_to_state(sim, skill)
 	if sim["kill_delta"] > 0:
 		return true
 	if sim["player_pos"] != before_pos:
@@ -1862,38 +1277,19 @@ func _count_effective_skills() -> int:
 	var effective: int = 0
 	for i: int in skill_slots.size():
 		var slot_data: Array = skill_slots[i]
-		var source_data: Array = _get_skill_slot_sources(i)
-		if slot_data.size() == 3 and _skill_changes_state(state, slot_data, source_data):
+		if slot_data.size() == 3 and _skill_changes_state(state, slot_data):
 			effective += 1
 	return effective
 
 func _has_combinable_material() -> bool:
-	if char_config.use_unified_slots:
-		if char_config.use_rdr_classifier:
-			return rdr_pending_vector != CharacterData.Direction.NONE
-		if char_config.use_exe_manual_slotting:
-			if action_seq.is_empty():
-				return false
-			if exe_pending_attack_slot >= 0:
-				return true
-			var used_index: int = action_seq.size() - 1
-			if used_index < 0 or used_index >= action_seq_used_for_space.size() or action_seq_used_for_space[used_index]:
-				return false
-			var dir_seq: int = action_seq[used_index]
-			var latest_is_attack: bool = action_seq_is_attack[used_index]
-			for slot_data: Array in skill_slots:
-				if _can_store_exe_skill_component(slot_data, dir_seq, latest_is_attack):
-					return true
-			return false
-		for slot_data: Array in skill_slots:
-			if slot_data.size() == 1:
-				return true
+	if not synthesis.has_pending():
 		return false
-	if action_seq.is_empty():
-		return false
-	if char_config.skill_mixed:
-		return action_seq.size() >= 2
-	return not attack_queue.is_empty()
+	if synthesis.selected_slot >= 0:
+		return synthesis.can_store_in_slot(synthesis.selected_slot)
+	for i: int in synthesis.slots.size():
+		if synthesis.can_store_in_slot(i):
+			return true
+	return false
 
 func check_loss_state() -> bool:
 	if _play_mode == PlayMode.GUARD:
