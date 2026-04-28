@@ -29,6 +29,7 @@ func record_move(board_dir: int) -> bool:
 	var dir: int = board_dir_to_core(board_dir)
 	if dir < 0:
 		return false
+	_clear_tokens_of_kind(TokenKind.MOVE)
 	pending_move_token = token_code(TokenKind.MOVE, dir)
 	tokens.append(pending_move_token)
 	return true
@@ -55,7 +56,7 @@ func tokens_in_priority_order() -> Array:
 func consume(token: int) -> void:
 	tokens.erase(token)
 	if token == pending_move_token:
-		pending_move_token = _last_token_of_kind(TokenKind.MOVE)
+		pending_move_token = NO_TOKEN
 	elif token == pending_attack_token:
 		pending_attack_token = _last_token_of_kind(TokenKind.ATTACK)
 
@@ -69,3 +70,10 @@ func _last_token_of_kind(kind: int) -> int:
 		if int(token / 4) == kind:
 			return token
 	return NO_TOKEN
+
+
+func _clear_tokens_of_kind(kind: int) -> void:
+	for i: int in range(tokens.size() - 1, -1, -1):
+		var token: int = tokens[i]
+		if int(token / 4) == kind:
+			tokens.remove_at(i)
