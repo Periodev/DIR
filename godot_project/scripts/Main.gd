@@ -1,9 +1,32 @@
 extends Node
 
+const LevelConstants = preload("res://scripts/LevelConstants.gd")
+
 @onready var board: Node2D = $Board
+var _debug_level_index: int = 0
 
 func _ready() -> void:
-	board.restart()
+	_load_level_by_index(_debug_level_index)
+
+
+func _load_default_level() -> void:
+	_load_level_by_index(0)
+
+
+func _load_level_by_index(index: int) -> void:
+	var levels: Array = LevelConstants.LEVELS
+	if levels.is_empty():
+		return
+	_debug_level_index = clampi(index, 0, levels.size() - 1)
+	board.load_level_definition(levels[_debug_level_index].duplicate(true))
+
+
+func _load_prev_level() -> void:
+	_load_level_by_index(_debug_level_index - 1)
+
+
+func _load_next_level() -> void:
+	_load_level_by_index(_debug_level_index + 1)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey) or not event.pressed or event.echo:
@@ -19,7 +42,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 
 	if keycode == KEY_R:
-		board.restart()
+		_load_level_by_index(_debug_level_index)
+		get_viewport().set_input_as_handled()
+		return
+
+	if keycode == KEY_F1:
+		_load_prev_level()
+		get_viewport().set_input_as_handled()
+		return
+
+	if keycode == KEY_F2:
+		_load_next_level()
 		get_viewport().set_input_as_handled()
 		return
 

@@ -14,6 +14,7 @@ const ATK_QUEUE_GAP: float = 12.0
 const SKILL_MARGIN_TOP: float = 20.0
 const PENDING_CIRCLE_SIZE: float = 72.0
 const PENDING_CIRCLE_GAP: float = 18.0
+const SHOW_SIDE_STATS: bool = false
 
 signal board_updated
 
@@ -61,10 +62,12 @@ const _EXE_SCRIPT = preload("res://scripts/CharacterImpl_EXE.gd")
 const _SCORE_TRACKER_SCRIPT = preload("res://scripts/ScoreTracker.gd")
 const _BOARD_STATE_SCRIPT = preload("res://scripts/BoardState.gd")
 const _BOARD_RULES_SCRIPT = preload("res://scripts/BoardRules.gd")
+const _ASCII_LEVEL_MODE_SCRIPT = preload("res://scripts/AsciiLevelMode.gd")
 
 var cell_nodes: Array[Array] = []
 var _cell_scene: PackedScene = null
 var _arrow_overlay: Node2D = null
+var level_mode: RefCounted = null
 
 class ArrowOverlay extends Node2D:
 	var board: Node2D
@@ -283,19 +286,15 @@ func restart() -> void:
 	if board_rules == null:
 		board_rules = _BOARD_RULES_SCRIPT.new()
 	_rng.randomize()
-	_board_cols = 4 if _play_mode == PlayMode.SURVIVAL else COLS
-	_board_rows = 4 if _play_mode == PlayMode.SURVIVAL else ROWS
+	if _play_mode == PlayMode.SURVIVAL:
+		_board_cols = 4
+		_board_rows = 4
+	else:
+		var level_dims: Vector2i = _get_level_dimensions()
+		_board_cols = level_dims.x
+		_board_rows = level_dims.y
 	_update_board_offset()
-	grid.clear()
-	polluted_grid.clear()
-	for _r: int in _board_rows:
-		var row: Array[int] = []
-		var polluted_row: Array[bool] = []
-		for _c: int in _board_cols:
-			row.append(CharacterData.CellType.LIVE)
-			polluted_row.append(false)
-		grid.append(row)
-		polluted_grid.append(polluted_row)
+	_initialize_empty_board()
 	player_pos = Vector2i(_board_cols / 2, _board_rows / 2)
 	moves_this_turn = 0
 	attacks_this_turn = 0
@@ -321,9 +320,102 @@ func restart() -> void:
 	_pending_attack_marked = false
 	_pending_move_marked = false
 	_next_spawn_preview.clear()
+	if not _apply_level_mode():
+		push_error("Level mode apply failed: %s" % _get_level_mode_error())
 	if is_control_mode():
 		_compute_next_guard_preview()
 	_refresh_visuals()
+
+
+func set_level_mode(mode: RefCounted) -> void:
+	level_mode = mode
+
+
+func clear_level_mode() -> void:
+	level_mode = null
+
+
+func load_ascii_level(object_map: String, direction_map: String) -> void:
+	level_mode = _ASCII_LEVEL_MODE_SCRIPT.new(object_map, direction_map)
+	restart()
+
+
+func load_level_definition(level_def: Dictionary) -> void:
+	var mode: RefCounted = _ASCII_LEVEL_MODE_SCRIPT.new()
+	if mode.has_method("configure_level"):
+		mode.configure_level(level_def)
+	level_mode = mode
+	restart()
+
+
+func _get_level_dimensions() -> Vector2i:
+	if level_mode != null and level_mode.has_method("get_dimensions"):
+		var dims: Vector2i = level_mode.get_dimensions(Vector2i(COLS, ROWS))
+		if dims.x > COLS or dims.y > ROWS or dims.x <= 0 or dims.y <= 0:
+			return Vector2i(COLS, ROWS)
+		return dims
+	return Vector2i(COLS, ROWS)
+
+
+func _initialize_empty_board() -> void:
+	grid.clear()
+	polluted_grid.clear()
+	for _r: int in _board_rows:
+		var row: Array[int] = []
+		var polluted_row: Array[bool] = []
+		for _c: int in _board_cols:
+			row.append(CharacterData.CellType.LIVE)
+			polluted_row.append(false)
+		grid.append(row)
+		polluted_grid.append(polluted_row)
+
+
+func _apply_level_mode() -> bool:
+	if _play_mode == PlayMode.SURVIVAL:
+		return true
+	if level_mode == null:
+		return true
+	if not level_mode.has_method("apply_to_board"):
+		return false
+	return level_mode.apply_to_board(self)
+
+
+func _get_level_mode_error() -> String:
+	if level_mode != null and level_mode.has_method("get_last_error"):
+		return level_mode.get_last_error()
+	return "Unknown level mode error."
+
+
+func _should_auto_spawn_on_end_turn() -> bool:
+	if level_mode != null and level_mode.has_method("should_auto_spawn_on_end_turn"):
+		return level_mode.should_auto_spawn_on_end_turn()
+	return true
+
+
+func get_level_id() -> int:
+	if level_mode != null and level_mode.has_method("get_level_id"):
+		return level_mode.get_level_id(0)
+	return 0
+
+
+func get_level_title() -> String:
+	if level_mode != null and level_mode.has_method("get_level_title"):
+		return level_mode.get_level_title("")
+	return ""
+
+
+func get_move_limit() -> int:
+	var fallback: int = char_config.max_moves if char_config != null else 0
+	if level_mode != null and level_mode.has_method("get_move_limit"):
+		return level_mode.get_move_limit(fallback)
+	return fallback
+
+
+func get_attack_limit() -> int:
+	var fallback: int = char_config.max_attacks if char_config != null else 0
+	if level_mode != null and level_mode.has_method("get_attack_limit"):
+		return level_mode.get_attack_limit(fallback)
+	return fallback
 
 func is_polluted(pos: Vector2i) -> bool:
 	return _in_bounds(pos) and polluted_grid[pos.y][pos.x]
@@ -377,7 +469,7 @@ func try_move(dir: int) -> bool:
 	if game_over:
 		return false
 	_auto_store_exe_pending()
-	if moves_this_turn >= char_config.max_moves + bonus_moves:
+	if moves_this_turn >= get_move_limit() + bonus_moves:
 		return false
 	if not is_basic_move_legal(player_pos, dir):
 		return false
@@ -395,7 +487,7 @@ func try_attack(dir: int) -> bool:
 	_auto_store_exe_pending()
 	if is_polluted(player_pos):
 		return false
-	if attacks_this_turn >= char_config.max_attacks + bonus_attacks:
+	if attacks_this_turn >= get_attack_limit() + bonus_attacks:
 		return false
 	var dv: Vector2i = CharacterData.DIR_VECTOR[dir]
 	var target: Vector2i = player_pos + dv
@@ -437,7 +529,8 @@ func try_end_turn() -> bool:
 		_compute_next_guard_preview()
 	else:
 		_spread_pollution()
-		debug_spawn_enemies(_spawn_count_for_turn(turn))
+		if _should_auto_spawn_on_end_turn():
+			debug_spawn_enemies(_spawn_count_for_turn(turn))
 	check_loss_state()
 	_refresh_visuals()
 	return true
@@ -763,8 +856,8 @@ func _draw() -> void:
 	var base_ui_y: float = _board_rows * CELL_STEP + SEQ_MARGIN_TOP
 	var seq_y: float
 
-	var rem_moves: int = char_config.max_moves + bonus_moves - moves_this_turn
-	var rem_atk: int = char_config.max_attacks + bonus_attacks - attacks_this_turn
+	var rem_moves: int = get_move_limit() + bonus_moves - moves_this_turn
+	var rem_atk: int = get_attack_limit() + bonus_attacks - attacks_this_turn
 	var avg_slot_usage: float = score_tracker.average_slot_usage()
 	var move_usage_ratio: float = score_tracker.move_usage_ratio()
 	var skill_font_size: int = 26
@@ -832,49 +925,49 @@ func _draw() -> void:
 
 	var threat: Dictionary = score_pollution_threat()
 	var side_x: float = board_w + 28.0
-	draw_string(font, Vector2(side_x, 26.0), "TURN",
+	var level_id: int = get_level_id()
+	var level_title: String = get_level_title()
+	var level_label: String = "LEVEL %d" % level_id if level_id > 0 else "LEVEL"
+	draw_string(font, Vector2(side_x, 26.0), level_label,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 66.0), str(turn),
+	draw_string(font, Vector2(side_x, 50.0), level_title if not level_title.is_empty() else "-",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 0.95))
+	draw_string(font, Vector2(side_x, 84.0), "TURN",
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+	draw_string(font, Vector2(side_x, 124.0), str(turn),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color.WHITE)
-	draw_string(font, Vector2(side_x, 94.0), "SPAWN",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 118.0), "SEEDED" if _spawn_mode == SpawnMode.SEEDED else "RANDOM",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 0.95))
-	draw_string(font, Vector2(side_x, 146.0), "MODE",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 170.0), get_play_mode_label(),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.9, 0.9, 0.95))
-	draw_string(font, Vector2(side_x, 204.0), "KILL",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 244.0), str(kill_count),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color(1.0, 0.4, 0.4))
-	draw_string(font, Vector2(side_x, 278.0), "THREAT",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 318.0), str(threat["score"]),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.45, 0.9, 0.45))
-	draw_string(font, Vector2(side_x, 352.0), "AVG SLOT",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 392.0), "%.1f" % avg_slot_usage,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.95, 0.9, 0.55))
-	draw_string(font, Vector2(side_x, 426.0), "MOVE%",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 466.0), "%.0f%%" % (move_usage_ratio * 100.0),
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.85, 0.95, 1.0))
-	draw_string(font, Vector2(side_x, 506.0), "EXE SKILL",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
-	draw_string(font, Vector2(side_x, 530.0), "SKL S% K R%",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.7, 0.75))
-	var skill_rows: Array[Dictionary] = score_tracker.skill_rows()
-	for i: int in skill_rows.size():
-		var row: Dictionary = skill_rows[i]
-		var row_text: String = "%s %2d %.1f %2d" % [
-			row["label"],
-			row["synth_pct"],
-			row["avg_kills"],
-			row["recovery_pct"],
-		]
-		draw_string(font, Vector2(side_x, 552.0 + i * 18.0), row_text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.9, 0.9, 0.95))
+	if SHOW_SIDE_STATS:
+		draw_string(font, Vector2(side_x, 262.0), "KILL",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+		draw_string(font, Vector2(side_x, 302.0), str(kill_count),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color(1.0, 0.4, 0.4))
+		draw_string(font, Vector2(side_x, 336.0), "THREAT",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+		draw_string(font, Vector2(side_x, 376.0), str(threat["score"]),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.45, 0.9, 0.45))
+		draw_string(font, Vector2(side_x, 410.0), "AVG SLOT",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+		draw_string(font, Vector2(side_x, 450.0), "%.1f" % avg_slot_usage,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.95, 0.9, 0.55))
+		draw_string(font, Vector2(side_x, 484.0), "MOVE%",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+		draw_string(font, Vector2(side_x, 524.0), "%.0f%%" % (move_usage_ratio * 100.0),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 36, Color(0.85, 0.95, 1.0))
+		draw_string(font, Vector2(side_x, 564.0), "EXE SKILL",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+		draw_string(font, Vector2(side_x, 588.0), "SKL S% K R%",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.7, 0.7, 0.75))
+		var skill_rows: Array[Dictionary] = score_tracker.skill_rows()
+		for i: int in skill_rows.size():
+			var row: Dictionary = skill_rows[i]
+			var row_text: String = "%s %2d %.1f %2d" % [
+				row["label"],
+				row["synth_pct"],
+				row["avg_kills"],
+				row["recovery_pct"],
+			]
+			draw_string(font, Vector2(side_x, 610.0 + i * 18.0), row_text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(0.9, 0.9, 0.95))
 	if game_over:
 		draw_rect(Rect2(-14.0, -14.0, board_w + 160.0, _board_rows * CELL_STEP + 30.0), Color(0, 0, 0, 0.35))
 		draw_string(font, Vector2(board_w * 0.15, _board_rows * CELL_STEP * 0.48), "FAILED",
