@@ -12,6 +12,8 @@ const SEQ_STEP: float = SEQ_SIZE + SEQ_GAP
 const SEQ_MARGIN_TOP: float = 20.0
 const ATK_QUEUE_GAP: float = 12.0
 const SKILL_MARGIN_TOP: float = 20.0
+const PENDING_CIRCLE_SIZE: float = 72.0
+const PENDING_CIRCLE_GAP: float = 18.0
 
 signal board_updated
 
@@ -50,6 +52,8 @@ var _play_mode: int = PlayMode.NORMAL
 var _board_cols: int = COLS
 var _board_rows: int = ROWS
 var _debug_skill_slot_override: int = -1
+var _pending_attack_marked: bool = false
+var _pending_move_marked: bool = false
 var _guard_quadrant_counts: Array = [0, 0, 0, 0]
 var _guard_active_quadrant: int = -1
 
@@ -314,6 +318,8 @@ func restart() -> void:
 	_guard_active_quadrant = -1
 	game_over = false
 	game_over_reason = ""
+	_pending_attack_marked = false
+	_pending_move_marked = false
 	_next_spawn_preview.clear()
 	if is_control_mode():
 		_compute_next_guard_preview()
@@ -493,6 +499,39 @@ func _draw_dashed_rect_outline(rect: Rect2, color: Color, width: float, dash_len
 		draw_line(Vector2(left, y), Vector2(left, seg_end_y), color, width, true)
 		draw_line(Vector2(right, y), Vector2(right, seg_end_y), color, width, true)
 		y += dash_len + gap_len
+
+
+func _draw_pending_circle(center: Vector2, radius: float, label: String, token: int, active_color: Color, text_color: Color, font: Font, font_size: int) -> void:
+	draw_circle(center, radius, Color(0.10, 0.10, 0.13))
+	draw_arc(center, radius, 0.0, TAU, 40, active_color if token != VectorSynthesisState.NO_TOKEN else Color(0.30, 0.30, 0.35), 2.0)
+	draw_string(
+		font,
+		Vector2(center.x - radius, center.y - radius - 6.0),
+		label,
+		HORIZONTAL_ALIGNMENT_CENTER,
+		radius * 2.0,
+		14,
+		Color(0.65, 0.65, 0.72)
+	)
+	if token != VectorSynthesisState.NO_TOKEN:
+		var token_y: float = center.y + font_size * 0.28
+		draw_string(
+			font,
+			Vector2(center.x - radius, token_y),
+			CharacterData.DIR_ARROWS[VectorSynthesisState.token_board_dir(token)],
+			HORIZONTAL_ALIGNMENT_CENTER,
+			radius * 2.0,
+			font_size,
+			text_color
+		)
+
+
+func toggle_pending_marker(is_attack_marker: bool) -> void:
+	if is_attack_marker:
+		_pending_attack_marked = not _pending_attack_marked
+	else:
+		_pending_move_marked = not _pending_move_marked
+	queue_redraw()
 
 func _spawn_order(seed: int) -> Array[Vector2i]:
 	var all: Array[Vector2i] = []
@@ -737,7 +776,8 @@ func _draw() -> void:
 	var slot_y: float = base_ui_y
 	exe_slot_x0 = slot_x0
 	exe_slot_y = slot_y
-	seq_y = slot_y + SEQ_SIZE + ATK_QUEUE_GAP
+	var pending_row_y: float = slot_y + SEQ_SIZE + 18.0
+	seq_y = pending_row_y + PENDING_CIRCLE_SIZE + 18.0
 	for i: int in slot_count:
 		var sx: float = slot_x0 + i * SEQ_STEP
 		var srect: Rect2 = Rect2(sx, slot_y, SEQ_SIZE, SEQ_SIZE)
@@ -766,25 +806,19 @@ func _draw() -> void:
 			else:
 				draw_rect(srect, Color(0.65, 0.65, 1.0) if is_armed else Color(0.30, 0.30, 0.35), false, 2.5 if is_armed else 1.5)
 
-	var temp_x: float = exe_slot_x0 - SEQ_STEP
-	var temp_size: float = SEQ_SIZE + 10.0
-	var temp_rect: Rect2 = Rect2(temp_x - 5.0, exe_slot_y - 5.0, temp_size, temp_size)
-	var action_x: float = seq_x0
-	var action_rect: Rect2 = Rect2(action_x, seq_y, SEQ_SIZE, SEQ_SIZE)
-	draw_rect(temp_rect, Color(0.10, 0.10, 0.13))
-	draw_rect(action_rect, Color(0.10, 0.10, 0.13))
 	var pending_attack_token: int = synthesis.pending_attack_token()
 	var pending_move_token: int = synthesis.pending_move_token()
-	if pending_attack_token != VectorSynthesisState.NO_TOKEN:
-		_draw_dashed_rect_outline(temp_rect, Color(1.0, 0.65, 0.2, 0.95), 2.0, 10.0, 6.0)
-		var temp_y: float = temp_rect.position.y + (temp_rect.size.y + font_size * 0.7) / 2.0
-		draw_string(font, Vector2(temp_rect.position.x, temp_y), CharacterData.DIR_ARROWS[VectorSynthesisState.token_board_dir(pending_attack_token)],
-			HORIZONTAL_ALIGNMENT_CENTER, temp_rect.size.x, font_size, Color(1.0, 0.72, 0.4, 0.65))
-	if pending_move_token != VectorSynthesisState.NO_TOKEN:
-		draw_rect(action_rect, Color(0.30, 0.30, 0.35), false, 1.5)
-		var move_y: float = seq_y + (SEQ_SIZE + font_size * 0.7) / 2.0
-		draw_string(font, Vector2(action_x, move_y), CharacterData.DIR_ARROWS[VectorSynthesisState.token_board_dir(pending_move_token)],
-			HORIZONTAL_ALIGNMENT_CENTER, SEQ_SIZE, font_size, Color.WHITE)
+	var pending_total_w: float = PENDING_CIRCLE_SIZE * 2.0 + PENDING_CIRCLE_GAP
+	var pending_x0: float = (board_w - pending_total_w) / 2.0
+	var pending_radius: float = PENDING_CIRCLE_SIZE / 2.0
+	var pending_a_center: Vector2 = Vector2(pending_x0 + pending_radius, pending_row_y + pending_radius)
+	var pending_m_center: Vector2 = Vector2(pending_x0 + PENDING_CIRCLE_SIZE + PENDING_CIRCLE_GAP + pending_radius, pending_row_y + pending_radius)
+	var pending_a_color: Color = Color(1.0, 0.35, 0.35, 1.0) if _pending_attack_marked else Color(1.0, 0.65, 0.2, 0.95)
+	var pending_m_color: Color = Color(0.35, 0.95, 0.55, 1.0) if _pending_move_marked else Color(0.85, 0.9, 1.0, 0.95)
+	var pending_a_text: Color = Color(1.0, 0.82, 0.82, 0.9) if _pending_attack_marked else Color(1.0, 0.72, 0.4, 0.75)
+	var pending_m_text: Color = Color(0.85, 1.0, 0.9, 0.95) if _pending_move_marked else Color.WHITE
+	_draw_pending_circle(pending_a_center, pending_radius, "Q / A", pending_attack_token, pending_a_color, pending_a_text, font, font_size)
+	_draw_pending_circle(pending_m_center, pending_radius, "E / M", pending_move_token, pending_m_color, pending_m_text, font, font_size)
 
 	var bottom_stat_x: float = 8.0
 	var bottom_stat_y: float = seq_y + SEQ_SIZE + 30.0
@@ -850,7 +884,7 @@ func _draw() -> void:
 
 func _update_board_offset() -> void:
 	var board_w: float = (_board_cols - 1) * CELL_STEP + CELL_SIZE
-	var total_h: float = _board_rows * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + ATK_QUEUE_GAP + SEQ_SIZE
+	var total_h: float = _board_rows * CELL_STEP + SEQ_MARGIN_TOP + SEQ_SIZE + 18.0 + PENDING_CIRCLE_SIZE + 18.0 + SEQ_SIZE
 	var vp: Vector2 = get_viewport_rect().size
 	position = Vector2((vp.x - board_w) / 2.0, (vp.y - total_h) / 2.0)
 

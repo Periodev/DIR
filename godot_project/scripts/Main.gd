@@ -10,15 +10,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	var keycode: Key = event.physical_keycode if event.physical_keycode != KEY_NONE else event.keycode
 
-	var skill_keycodes: Array[Key] = [KEY_Z, KEY_X, KEY_C, KEY_V, KEY_B, KEY_N, KEY_M, KEY_COMMA]
+	var skill_keycodes: Array[Key] = [KEY_1, KEY_2, KEY_3, KEY_4, KEY_KP_1, KEY_KP_2, KEY_KP_3, KEY_KP_4]
 	for i: int in skill_keycodes.size():
 		if keycode == skill_keycodes[i]:
-			board.set_skill_preview(i if board.get_selected_skill_slot() != i else -1)
+			var slot_index: int = i % 4
+			board.set_skill_preview(slot_index if board.get_selected_skill_slot() != slot_index else -1)
 			get_viewport().set_input_as_handled()
 			return
 
 	if keycode == KEY_R:
 		board.restart()
+		get_viewport().set_input_as_handled()
+		return
+
+	if keycode == KEY_Q:
+		board.toggle_pending_marker(true)
+		get_viewport().set_input_as_handled()
+		return
+
+	if keycode == KEY_E:
+		board.toggle_pending_marker(false)
 		get_viewport().set_input_as_handled()
 		return
 
