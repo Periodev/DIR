@@ -351,16 +351,14 @@ func _record_new_exe_syntheses(before_sizes: Array[int]) -> void:
 		if i < before_sizes.size() and before_sizes[i] < 2 and synthesis.slot_token_count(i) == 2:
 			_record_exe_skill_synthesis(synthesis.legacy_slot(i))
 
-func _auto_store_exe_pending() -> bool:
+func _auto_store_exe_pending() -> void:
 	if not synthesis.has_pending():
-		return true
+		return
 	var before_sizes: Array[int] = _synthesis_slot_sizes()
-	if not synthesis.auto_store_pending():
-		return false
+	synthesis.auto_store_pending()
 	_sync_exe_skill_slots()
 	_record_new_exe_syntheses(before_sizes)
 	_record_slot_usage_sample()
-	return true
 
 func can_combine_skill() -> bool:
 	return true
@@ -372,8 +370,7 @@ func is_basic_move_legal(from: Vector2i, dir: int, state: RefCounted = null) -> 
 func try_move(dir: int) -> bool:
 	if game_over:
 		return false
-	if not _auto_store_exe_pending():
-		return false
+	_auto_store_exe_pending()
 	if moves_this_turn >= char_config.max_moves + bonus_moves:
 		return false
 	if not is_basic_move_legal(player_pos, dir):
@@ -389,8 +386,7 @@ func try_move(dir: int) -> bool:
 func try_attack(dir: int) -> bool:
 	if game_over:
 		return false
-	if not _auto_store_exe_pending():
-		return false
+	_auto_store_exe_pending()
 	if is_polluted(player_pos):
 		return false
 	if attacks_this_turn >= char_config.max_attacks + bonus_attacks:
@@ -422,8 +418,7 @@ func try_attack(dir: int) -> bool:
 func try_end_turn() -> bool:
 	if game_over:
 		return false
-	if not _auto_store_exe_pending():
-		return false
+	_auto_store_exe_pending()
 	turn += 1
 	moves_this_turn = 0
 	attacks_this_turn = 0
@@ -970,8 +965,7 @@ func set_skill_preview(slot: int) -> void:
 	queue_redraw()
 
 func rotate_armed_skill(new_dir: int) -> void:
-	if not _auto_store_exe_pending():
-		return
+	_auto_store_exe_pending()
 	var slot: int = skill_preview
 	var data: Array = _slot_data(slot)
 	if slot < 0 or slot >= char_config.skill_slot_count or data.size() != 3:
