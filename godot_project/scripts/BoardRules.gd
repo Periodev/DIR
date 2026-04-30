@@ -109,11 +109,27 @@ func apply_skill_to_state(
 				state.player_moved = true
 				hit_cell(state, state.player_pos + dv_atk, slot_data[1], cols, rows, teleport_on_kill)
 		CharacterData.SkillType.SAME_AA:
-			hit_cell(state, pos + dv_seq, slot_data[0], cols, rows, teleport_on_kill)
+			var front_target: Vector2i = pos + dv_seq
+			if not cell_is_enemy(state, front_target, cols, rows):
+				return
+			hit_cell(state, front_target, slot_data[0], cols, rows, teleport_on_kill)
 			hit_cell(state, pos + 2 * dv_seq, slot_data[0], cols, rows, teleport_on_kill)
 		CharacterData.SkillType.ORTHO_AA:
 			hit_cell(state, pos + dv_seq, slot_data[0], cols, rows, teleport_on_kill)
 			hit_cell(state, pos + dv_atk, slot_data[1], cols, rows, teleport_on_kill)
+
+
+func skill_can_activate(
+	state: RefCounted,
+	skill: Array,
+	cols: int,
+	rows: int
+) -> bool:
+	var stype: int = CharacterData.classify_skill(skill)
+	if stype != CharacterData.SkillType.SAME_AA:
+		return true
+	var front_dir: int = skill[0]
+	return cell_is_enemy(state, state.player_pos + CharacterData.DIR_VECTOR[front_dir], cols, rows)
 
 func count_legal_moves_at(state: RefCounted, pos: Vector2i, cols: int, rows: int) -> int:
 	var count: int = 0
@@ -129,6 +145,8 @@ func skill_changes_state(
 	rows: int,
 	teleport_on_kill: bool
 ) -> bool:
+	if not skill_can_activate(state, skill, cols, rows):
+		return false
 	var before_pos: Vector2i = state.player_pos
 	var sim: RefCounted = state.duplicate_state()
 	apply_skill_to_state(sim, skill, cols, rows, teleport_on_kill)

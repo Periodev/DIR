@@ -1087,10 +1087,11 @@ func get_skill_preview_cells(slot: int) -> Dictionary:
 			result["move"].append(pos + dv_seq)
 			result["hit"].append(pos + dv_seq + dv_atk)
 		CharacterData.SkillType.SAME_AA:
-			if _in_bounds(pos + dv_seq):
-				result["hit"].append(pos + dv_seq)
-			if _in_bounds(pos + 2 * dv_seq):
-				result["hit"].append(pos + 2 * dv_seq)
+			var front_target: Vector2i = pos + dv_seq
+			if _in_bounds(front_target) and CharacterData.is_enemy(grid[front_target.y][front_target.x]):
+				result["hit"].append(front_target)
+				if _in_bounds(pos + 2 * dv_seq):
+					result["hit"].append(pos + 2 * dv_seq)
 		CharacterData.SkillType.ORTHO_AA:
 			if _in_bounds(pos + dv_seq):
 				result["hit"].append(pos + dv_seq)
@@ -1144,6 +1145,8 @@ func use_skill(slot: int) -> void:
 		return
 	var cast_skill: Array = slot_data.duplicate()
 	var live_state: RefCounted = _make_board_state(false)
+	if not board_rules.skill_can_activate(live_state, cast_skill, _board_cols, _board_rows):
+		return
 	board_rules.apply_skill_to_state(live_state, cast_skill, _board_cols, _board_rows, char_config.teleport_on_kill)
 	grid = live_state.grid
 	polluted_grid = live_state.polluted_grid
