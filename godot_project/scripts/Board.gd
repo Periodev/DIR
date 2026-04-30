@@ -1081,8 +1081,17 @@ func get_skill_preview_cells(slot: int) -> Dictionary:
 	var pos: Vector2i = player_pos
 	match stype:
 		CharacterData.SkillType.SAME_MA:
-			result["move"].append(pos + dv_seq)
-			result["hit"].append(pos + dv_seq)
+			var dash_pos: Vector2i = pos
+			for _step: int in 2:
+				var next_pos: Vector2i = dash_pos + dv_seq
+				if not _in_bounds(next_pos):
+					break
+				if CharacterData.is_enemy(grid[next_pos.y][next_pos.x]):
+					result["hit"].append(next_pos)
+					result["move"].append(next_pos)
+					break
+				dash_pos = next_pos
+				result["move"].append(dash_pos)
 		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
 			result["move"].append(pos + dv_seq)
 			result["hit"].append(pos + dv_seq + dv_atk)

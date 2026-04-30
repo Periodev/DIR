@@ -88,19 +88,18 @@ func apply_skill_to_state(
 	var pos: Vector2i = state.player_pos
 	match stype:
 		CharacterData.SkillType.SAME_MA:
-			var move_target: Vector2i = pos + dv_seq
-			if in_bounds(move_target, cols, rows):
-				if cell_is_enemy(state, move_target, cols, rows):
-					hit_cell(state, move_target, slot_data[0], cols, rows, teleport_on_kill)
-					if cell_is_enemy(state, move_target, cols, rows):
-						var push_dest: Vector2i = move_target + dv_seq
-						if not in_bounds(push_dest, cols, rows) or cell_is_enemy(state, push_dest, cols, rows):
-							hit_cell(state, move_target, CharacterData.opposite_dir(slot_data[0]), cols, rows, teleport_on_kill)
-						else:
-							state.grid[push_dest.y][push_dest.x] = state.grid[move_target.y][move_target.x]
-							state.grid[move_target.y][move_target.x] = CharacterData.CellType.LIVE
-							move_enemy_data(state, move_target, push_dest)
-				state.player_pos = move_target
+			var dash_pos: Vector2i = pos
+			for _step: int in 2:
+				var next_pos: Vector2i = dash_pos + dv_seq
+				if not in_bounds(next_pos, cols, rows):
+					break
+				if cell_is_enemy(state, next_pos, cols, rows):
+					hit_cell(state, next_pos, slot_data[0], cols, rows, teleport_on_kill)
+					dash_pos = next_pos
+					break
+				dash_pos = next_pos
+			if dash_pos != pos:
+				state.player_pos = dash_pos
 				state.player_moved = true
 		CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA:
 			var move_target2: Vector2i = pos + dv_seq
