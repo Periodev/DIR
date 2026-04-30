@@ -37,6 +37,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	for i: int in skill_keycodes.size():
 		if keycode == skill_keycodes[i]:
 			var slot_index: int = i % 4
+			if slot_index >= board.get_skill_slot_count():
+				get_viewport().set_input_as_handled()
+				return
 			board.set_skill_preview(slot_index if board.get_selected_skill_slot() != slot_index else -1)
 			get_viewport().set_input_as_handled()
 			return

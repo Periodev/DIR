@@ -201,6 +201,8 @@ func _load_char_config() -> void:
 	char_config = _EXE_SCRIPT.get_config()
 	if _debug_skill_slot_override > 0:
 		char_config.skill_slot_count = _debug_skill_slot_override
+	var unlocked_slot_count: int = get_unlocked_slot_count()
+	char_config.skill_slot_count = mini(char_config.skill_slot_count, unlocked_slot_count)
 
 func toggle_debug_skill_slots() -> void:
 	_debug_skill_slot_override = -1 if _debug_skill_slot_override > 0 else 8
@@ -416,6 +418,18 @@ func get_attack_limit() -> int:
 	if level_mode != null and level_mode.has_method("get_attack_limit"):
 		return level_mode.get_attack_limit(fallback)
 	return fallback
+
+
+func get_unlocked_slot_count() -> int:
+	var fallback: int = char_config.skill_slot_count if char_config != null else 1
+	if level_mode != null and level_mode.has_method("get_unlocked_slot_count"):
+		var level_count: int = level_mode.get_unlocked_slot_count(fallback)
+		return maxi(1, level_count)
+	return maxi(1, fallback)
+
+
+func get_skill_slot_count() -> int:
+	return char_config.skill_slot_count if char_config != null else 0
 
 func is_polluted(pos: Vector2i) -> bool:
 	return _in_bounds(pos) and polluted_grid[pos.y][pos.x]

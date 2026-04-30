@@ -24,6 +24,10 @@ func get_attack_limit(fallback: int) -> int:
 	return fallback
 
 
+func get_unlocked_slot_count(fallback: int) -> int:
+	return fallback
+
+
 func should_auto_spawn_on_end_turn() -> bool:
 	return true
 

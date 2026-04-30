@@ -12,6 +12,7 @@ E@E
 		"direction_map": "",
 		"move_limit": 0,
 		"attack_limit": 2,
+		"unlocked_slot_count": 1,
 	},
 
 	{
@@ -25,6 +26,7 @@ E@E
 		"direction_map": "",
 		"move_limit": 0,
 		"attack_limit": 2,
+		"unlocked_slot_count": 1,
 	},
 
 	{
@@ -38,6 +40,7 @@ EE@
 		"direction_map": "",
 		"move_limit": 1,
 		"attack_limit": 2,
+		"unlocked_slot_count": 1,
 	},
 
 	{
@@ -51,6 +54,7 @@ E.@
 		"direction_map": "",
 		"move_limit": 1,
 		"attack_limit": 2,
+		"unlocked_slot_count": 1,
 	},
     
 	{
@@ -64,6 +68,7 @@ E@E
 		"direction_map": "",
 		"move_limit": 2,
 		"attack_limit": 2,
+		"unlocked_slot_count": 1,
 	},
     
 	{
@@ -77,11 +82,12 @@ E..
 		"direction_map": "",
 		"move_limit": 2,
 		"attack_limit": 2,
+		"unlocked_slot_count": 1,
 	},
 
 	{
 		"id": 7,
-		"title": "Setup",
+		"title": "Corner",
 		"object_map": """
 E.. 
 E.. 
@@ -90,9 +96,38 @@ E@.
 		"direction_map": "",
 		"move_limit": 2,
 		"attack_limit": 2,
+		"unlocked_slot_count": 1,
 	},
 
+	{
+		"id": 8,
+		"title": "Separate",
+		"object_map": """
+..E.
+.E..
+E@..
+..E.
+""",
+		"direction_map": "",
+		"move_limit": 2,
+		"attack_limit": 2,
+		"unlocked_slot_count": 1,
+	},
 
+	{
+		"id": 9,
+		"title": "Sequence",
+		"object_map": """
+....
+.EE.
+.@E.
+E..E
+""",
+		"direction_map": "",
+		"move_limit": 3,
+		"attack_limit": 3,
+		"unlocked_slot_count": 1,
+	},
 
 
 ]
