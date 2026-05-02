@@ -124,52 +124,32 @@ E...
 		"zone": 2,
 		"index": 8,
 		"code": "2-8",
-		"title": "Cut in",
+		"title": "Step",
 		"object_map": """
-.@EE
-..E.
-.EE.
-..E.
+...
+.EE
+@.E
 """,
 		"direction_map": "",
 		"move_limit": 1,
-		"attack_limit": 3,
-		"unlocked_slot_count": 2,
+		"attack_limit": 2,
+		"unlocked_slot_count": 1,
 	},
 
 	{
 		"zone": 2,
 		"index": 9,
 		"code": "2-9",
-		"title": "Setup",
+		"title": "Pivot",
 		"object_map": """
-E@E
-.E.
-EE.
+.E.E
+....
+....
+@E..
 """,
 		"direction_map": "",
-		"move_limit": 1,
-		"attack_limit": 3,
-		"unlocked_slot_count": 2,
+		"move_limit": 2,
+		"attack_limit": 2,
+		"unlocked_slot_count": 1,
 	},
-
-	{
-		"zone": 2,
-		"index": 10,
-		"code": "2-10",
-		"title": "Brake",
-		"object_map": """
-@EE
-.EE
-.E.
-""",
-		"direction_map": "",
-		"move_limit": 1,
-		"attack_limit": 3,
-		"unlocked_slot_count": 2,
-	},
-
-
-
-
 ]

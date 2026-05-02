@@ -3,6 +3,7 @@ extends RefCounted
 
 const Zone1 = preload("res://scripts/LevelConstants_Zone1.gd")
 const Zone2 = preload("res://scripts/LevelConstants_Zone2.gd")
+const Zone3 = preload("res://scripts/LevelConstants_Zone3.gd")
 
 const DEFAULT_LOAD_ZONE: int = 2
 
@@ -26,7 +27,7 @@ static func first_level_index_for_zone(zone: int) -> int:
 static func all_levels() -> Array:
 	var result: Array = []
 	var next_id: int = 1
-	for source_levels: Array in [Zone1.LEVELS, Zone2.LEVELS]:
+	for source_levels: Array in [Zone1.LEVELS, Zone2.LEVELS, Zone3.LEVELS]:
 		for source_level: Dictionary in source_levels:
 			var level: Dictionary = source_level.duplicate(true)
 			level["id"] = next_id
