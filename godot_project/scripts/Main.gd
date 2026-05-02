@@ -6,15 +6,15 @@ const LevelConstants = preload("res://scripts/LevelConstants.gd")
 var _debug_level_index: int = 0
 
 func _ready() -> void:
-	_load_level_by_index(_debug_level_index)
+	_load_default_level()
 
 
 func _load_default_level() -> void:
-	_load_level_by_index(0)
+	_load_level_by_index(LevelConstants.first_level_index_for_zone(LevelConstants.DEFAULT_LOAD_ZONE))
 
 
 func _load_level_by_index(index: int) -> void:
-	var levels: Array = LevelConstants.LEVELS
+	var levels: Array = LevelConstants.all_levels()
 	if levels.is_empty():
 		return
 	_debug_level_index = clampi(index, 0, levels.size() - 1)
