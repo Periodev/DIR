@@ -525,7 +525,7 @@ func try_attack(dir: int) -> bool:
 		if char_config.teleport_on_kill:
 			player_pos = target
 	var killed: bool = grid[target.y][target.x] == CharacterData.CellType.LIVE
-	if killed and allows_kill_recovery():
+	if killed:
 		synthesis.record_attack_kill(dir)
 		_sync_exe_skill_slots()
 	attacks_this_turn += 1
