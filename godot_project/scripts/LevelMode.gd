@@ -28,6 +28,10 @@ func get_unlocked_slot_count(fallback: int) -> int:
 	return fallback
 
 
+func allows_kill_recovery() -> bool:
+	return true
+
+
 func should_auto_spawn_on_end_turn() -> bool:
 	return true
 

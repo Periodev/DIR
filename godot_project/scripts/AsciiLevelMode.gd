@@ -59,6 +59,12 @@ func get_unlocked_slot_count(fallback: int) -> int:
 	return int(level_data.get("unlocked_slot_count", fallback))
 
 
+func allows_kill_recovery() -> bool:
+	if level_data.has("kill_recovery_enabled"):
+		return bool(level_data.get("kill_recovery_enabled", false))
+	return int(level_data.get("zone", 1)) >= 3
+
+
 func should_auto_spawn_on_end_turn() -> bool:
 	return false
 

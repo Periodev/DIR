@@ -428,6 +428,12 @@ func get_unlocked_slot_count() -> int:
 	return maxi(1, fallback)
 
 
+func allows_kill_recovery() -> bool:
+	if level_mode != null and level_mode.has_method("allows_kill_recovery"):
+		return level_mode.allows_kill_recovery()
+	return true
+
+
 func get_skill_slot_count() -> int:
 	return char_config.skill_slot_count if char_config != null else 0
 
@@ -519,7 +525,7 @@ func try_attack(dir: int) -> bool:
 		if char_config.teleport_on_kill:
 			player_pos = target
 	var killed: bool = grid[target.y][target.x] == CharacterData.CellType.LIVE
-	if killed:
+	if killed and allows_kill_recovery():
 		synthesis.record_attack_kill(dir)
 		_sync_exe_skill_slots()
 	attacks_this_turn += 1
@@ -1166,10 +1172,12 @@ func use_skill(slot: int) -> void:
 	guard_control_quadrant = live_state.guard_control_quadrant
 	kill_count += live_state.kill_delta
 	bonus_moves += live_state.bonus_moves_delta
-	_record_exe_skill_cast(cast_skill, live_state.kill_delta, live_state.recovered_dirs.size())
+	var recovered_count: int = live_state.recovered_dirs.size() if allows_kill_recovery() else 0
+	_record_exe_skill_cast(cast_skill, live_state.kill_delta, recovered_count)
 	synthesis.clear_slot(slot)
 	_sync_exe_skill_slots()
-	_apply_recovered_dirs_to_slots(live_state.recovered_dirs)
+	if allows_kill_recovery():
+		_apply_recovered_dirs_to_slots(live_state.recovered_dirs)
 	_record_step_stats(false, true)
 	_refresh_visuals()
 
