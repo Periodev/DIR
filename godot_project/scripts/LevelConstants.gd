@@ -5,7 +5,7 @@ const Zone1 = preload("res://scripts/LevelConstants_Zone1.gd")
 const Zone2 = preload("res://scripts/LevelConstants_Zone2.gd")
 const Zone3 = preload("res://scripts/LevelConstants_Zone3.gd")
 
-const DEFAULT_LOAD_ZONE: int = 2
+const DEFAULT_LOAD_ZONE: int = 3
 
 
 static func first_level() -> Dictionary:

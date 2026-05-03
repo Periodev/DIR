@@ -17,6 +17,7 @@ const LEVELS := [
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		#MASR
 	},
 
 	{
@@ -34,6 +35,7 @@ const LEVELS := [
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		#AMSR
 	},
 
 	{
@@ -51,6 +53,7 @@ const LEVELS := [
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		#AMSR
 	},
 
 	{
@@ -67,6 +70,7 @@ E..
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		#MASR
 	},
 
 	{
@@ -84,6 +88,7 @@ E..
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		#MASR
 	},
 	{
 		"zone": 2,
@@ -100,6 +105,7 @@ E...
 		"move_limit": 2,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		#MMASR
 	},
 
 
@@ -118,6 +124,7 @@ E...
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#MAMSRA
 	},
 
 	{
@@ -134,6 +141,7 @@ E...
 		"move_limit": 1,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#MASRA
 	},
 
 	{
@@ -151,5 +159,6 @@ E...
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#AMSRAMSR
 	},
 ]

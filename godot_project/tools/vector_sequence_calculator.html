@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>DIR Vector Sequence Calculator</title>
+	<style>
+		:root {
+			--bg: #151719;
+			--panel: #202327;
+			--panel-soft: #292d32;
+			--line: #3a4048;
+			--text: #edf0f2;
+			--muted: #9ba4ad;
+			--accent: #f0b84a;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		body {
+			margin: 0;
+			min-height: 100vh;
+			background:
+				linear-gradient(135deg, rgba(240, 184, 74, 0.10), transparent 36%),
+				linear-gradient(210deg, rgba(111, 198, 255, 0.08), transparent 42%),
+				var(--bg);
+			color: var(--text);
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		}
+
+		main {
+			display: grid;
+			grid-template-columns: minmax(280px, 360px) minmax(320px, 1fr);
+			gap: 24px;
+			width: min(1180px, calc(100vw - 32px));
+			margin: 32px auto;
+			align-items: start;
+		}
+
+		.panel {
+			background: color-mix(in srgb, var(--panel) 92%, transparent);
+			border: 1px solid var(--line);
+			border-radius: 8px;
+			padding: 18px;
+			box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+		}
+
+		h1 {
+			margin: 0 0 16px;
+			font-size: 22px;
+			letter-spacing: 0;
+		}
+
+		label {
+			display: block;
+			margin-bottom: 6px;
+			color: var(--muted);
+			font-size: 12px;
+			text-transform: uppercase;
+		}
+
+		controls {
+			display: grid;
+		}
+
+		.fields {
+			display: grid;
+			grid-template-columns: repeat(3, 1fr);
+			gap: 10px;
+			margin-bottom: 14px;
+		}
+
+		input,
+		button,
+		textarea {
+			font: inherit;
+		}
+
+		input {
+			width: 100%;
+			padding: 10px 12px;
+			color: var(--text);
+			background: var(--panel-soft);
+			border: 1px solid var(--line);
+			border-radius: 6px;
+		}
+
+		button {
+			width: 100%;
+			min-height: 44px;
+			color: var(--text);
+			background: #332b1b;
+			border: 1px solid var(--accent);
+			border-radius: 6px;
+			cursor: pointer;
+		}
+
+		.summary {
+			margin: 14px 0 0;
+			color: var(--muted);
+			font-size: 13px;
+			line-height: 1.5;
+		}
+
+		textarea {
+			width: 100%;
+			min-height: 580px;
+			resize: vertical;
+			padding: 12px;
+			color: var(--text);
+			background: #101214;
+			border: 1px solid var(--line);
+			border-radius: 6px;
+			line-height: 1.5;
+		}
+
+		@media (max-width: 820px) {
+			main {
+				grid-template-columns: 1fr;
+				margin-block: 16px;
+			}
+
+			textarea {
+				min-height: 360px;
+			}
+		}
+	</style>
+</head>
+<body>
+	<main>
+		<section class="panel">
+			<h1>Vector Sequence Calculator</h1>
+
+			<div class="fields">
+				<div>
+					<label for="moveInput">M</label>
+					<input id="moveInput" type="number" min="0" max="8" value="1">
+				</div>
+				<div>
+					<label for="attackInput">A</label>
+					<input id="attackInput" type="number" min="0" max="8" value="3">
+				</div>
+				<div>
+					<label for="slotInput">Slots</label>
+					<input id="slotInput" type="number" min="1" max="4" value="2">
+				</div>
+			</div>
+
+			<button id="calculateButton" type="button">Calculate</button>
+			<div id="summary" class="summary"></div>
+		</section>
+
+		<section class="panel">
+			<label for="resultOutput">Legal Abstract Sequences</label>
+			<textarea id="resultOutput" spellcheck="false"></textarea>
+		</section>
+	</main>
+
+	<script>
+		const moveInput = document.querySelector("#moveInput");
+		const attackInput = document.querySelector("#attackInput");
+		const slotInput = document.querySelector("#slotInput");
+		const calculateButton = document.querySelector("#calculateButton");
+		const summaryEl = document.querySelector("#summary");
+		const resultOutput = document.querySelector("#resultOutput");
+
+		function clampInt(value, min, max) {
+			const parsed = Number.parseInt(value, 10);
+			if (Number.isNaN(parsed)) return min;
+			return Math.max(min, Math.min(max, parsed));
+		}
+
+		function stateKey(state) {
+			return [
+				state.movesLeft,
+				state.attacksLeft,
+				state.pendingMove,
+				state.pendingAttacks,
+				state.slots.join(","),
+			].join("|");
+		}
+
+		function skillCanBeMade(state) {
+			return state.pendingAttacks > 0 && (state.pendingMove > 0 || state.pendingAttacks > 1);
+		}
+
+		function hasFreeSlot(state) {
+			return state.slots.length < state.slotLimit;
+		}
+
+		function addMove(state) {
+			if (state.movesLeft <= 0) return null;
+			return {
+				...state,
+				movesLeft: state.movesLeft - 1,
+				pendingMove: 1,
+			};
+		}
+
+		function addAttack(state) {
+			if (state.attacksLeft <= 0) return null;
+			return {
+				...state,
+				attacksLeft: state.attacksLeft - 1,
+				pendingAttacks: state.pendingAttacks + 1,
+			};
+		}
+
+		function synthesize(state, skillKind) {
+			if (!hasFreeSlot(state)) return null;
+			if (skillKind === "MA") {
+				if (state.pendingMove <= 0 || state.pendingAttacks <= 0) return null;
+				return {
+					...state,
+					pendingMove: 0,
+					pendingAttacks: state.pendingAttacks - 1,
+					slots: [...state.slots, "MA"],
+				};
+			}
+			if (skillKind === "AA") {
+				if (state.pendingAttacks < 2) return null;
+				return {
+					...state,
+					pendingAttacks: state.pendingAttacks - 2,
+					slots: [...state.slots, "AA"],
+				};
+			}
+			return null;
+		}
+
+		function release(state, slotIndex) {
+			if (slotIndex < 0 || slotIndex >= state.slots.length) return null;
+			const nextSlots = state.slots.slice();
+			nextSlots.splice(slotIndex, 1);
+			return {
+				...state,
+				slots: nextSlots,
+			};
+		}
+
+		function isFinished(state) {
+			return state.movesLeft === 0
+				&& state.attacksLeft === 0
+				&& state.pendingMove === 0
+				&& state.pendingAttacks === 0
+				&& state.slots.length === 0;
+		}
+
+		function calculate(moveCount, attackCount, slotLimit) {
+			const start = {
+				movesLeft: moveCount,
+				attacksLeft: attackCount,
+				pendingMove: 0,
+				pendingAttacks: 0,
+				slots: [],
+				slotLimit,
+			};
+			const results = [];
+			const stack = [{ state: start, sequence: "" }];
+			const maxDepth = moveCount + attackCount + 2 * slotLimit + 4;
+			const seenAtDepth = new Set();
+
+			while (stack.length > 0) {
+				const current = stack.pop();
+				const state = current.state;
+				const sequence = current.sequence;
+
+				if (isFinished(state)) {
+					results.push(sequence);
+					continue;
+				}
+				if (sequence.length > maxDepth) continue;
+
+				const dedupeKey = `${sequence.length}:${stateKey(state)}:${sequence}`;
+				if (seenAtDepth.has(dedupeKey)) continue;
+				seenAtDepth.add(dedupeKey);
+
+				const releaseCount = state.slots.length;
+				for (let i = releaseCount - 1; i >= 0; i -= 1) {
+					const next = release(state, i);
+					if (next) stack.push({ state: next, sequence: `${sequence}R` });
+				}
+
+				for (const kind of ["AA", "MA"]) {
+					const next = synthesize(state, kind);
+					if (next) stack.push({ state: next, sequence: `${sequence}S` });
+				}
+
+				const attackNext = addAttack(state);
+				if (attackNext) stack.push({ state: attackNext, sequence: `${sequence}A` });
+
+				const moveNext = addMove(state);
+				if (moveNext) stack.push({ state: moveNext, sequence: `${sequence}M` });
+			}
+
+			return Array.from(new Set(results)).sort((a, b) => a.length - b.length || a.localeCompare(b));
+		}
+
+		function run() {
+			const moveCount = clampInt(moveInput.value, 0, 8);
+			const attackCount = clampInt(attackInput.value, 0, 8);
+			const slotLimit = clampInt(slotInput.value, 1, 4);
+			moveInput.value = String(moveCount);
+			attackInput.value = String(attackCount);
+			slotInput.value = String(slotLimit);
+
+			const results = calculate(moveCount, attackCount, slotLimit);
+			resultOutput.value = results.join("\n");
+			summaryEl.textContent = `${results.length} legal abstract sequences for ${moveCount}M${attackCount}A / ${slotLimit} slots.`;
+		}
+
+		calculateButton.addEventListener("click", run);
+		run();
+	</script>
+</body>
+</html>

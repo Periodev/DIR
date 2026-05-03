@@ -15,6 +15,7 @@ E@E
 		"move_limit": 0,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#AASR
 	},
 
 	{
@@ -31,6 +32,7 @@ E@E
 		"move_limit": 0,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#AASR
 	},
 
 	{
@@ -46,6 +48,7 @@ EE@
 		"move_limit": 1,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#AASMR
 	},
 
 	{
@@ -61,6 +64,7 @@ E.@
 		"move_limit": 1,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#AMASR
 	},
 
 	{
@@ -77,6 +81,7 @@ E@E
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#AMMASR
 	},
 
 	{
@@ -93,6 +98,7 @@ E..
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#AMAMSR, MAMASR
 	},
 
 	{
@@ -109,6 +115,7 @@ E@.
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#AMASMR
 	},
 
 	{
@@ -126,6 +133,7 @@ E@..
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		#AMASMR
 	},
 
 	{
@@ -142,5 +150,6 @@ E.EE
 		"move_limit": 2,
 		"attack_limit": 3,
 		"unlocked_slot_count": 1,
+		#AMASAMR
 	},
 ]
