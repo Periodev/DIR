@@ -97,6 +97,23 @@ EE@
 		#AMSARASR
 	},
 
+	{
+		"zone": 3,
+		"index": 6,
+		"code": "3-6",
+		"title": "Weave",
+		"object_map": """
+.E.E
+...E
+E.@E
+""",
+		"direction_map": "",
+		"move_limit": 2,
+		"attack_limit": 3,
+		"unlocked_slot_count": 2,
+		"kill_recovery_enabled": false,
+		#MAMASRASR, AMASMASRR
+	},
 
 
 ]
