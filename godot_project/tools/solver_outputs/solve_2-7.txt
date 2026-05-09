@@ -1,0 +1,5 @@
+2-7 Dash
+resources: 2M / 2A, slots: 1, recovery: False
+search: max_steps=14, solution_limit=10
+solutions found: 1
+1. MU | AR | MR | S1 | R1(IMA-U) | AR

@@ -45,6 +45,7 @@ var enemy_pollution_dir: Dictionary = {}
 var guard_control_quadrant: Dictionary = {}
 var game_over: bool = false
 var game_over_reason: String = ""
+var hud_message: String = ""
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _next_spawn_preview: Array = []
@@ -309,6 +310,7 @@ func restart() -> void:
 		skill_slots[i] = []
 	skill_preview = -1
 	synthesis.reset(char_config.skill_slot_count)
+	synthesis.set_allowed_skill_types(get_allowed_skill_types())
 	_sync_exe_skill_slots()
 	kill_count = 0
 	shield_spawn_turn.clear()
@@ -319,6 +321,7 @@ func restart() -> void:
 	_guard_active_quadrant = -1
 	game_over = false
 	game_over_reason = ""
+	hud_message = ""
 	_pending_attack_marked = false
 	_pending_move_marked = false
 	_next_spawn_preview.clear()
@@ -426,6 +429,13 @@ func get_unlocked_slot_count() -> int:
 		var level_count: int = level_mode.get_unlocked_slot_count(fallback)
 		return maxi(1, level_count)
 	return maxi(1, fallback)
+
+
+func get_allowed_skill_types() -> Array:
+	var fallback: Array = []
+	if level_mode != null and level_mode.has_method("get_allowed_skill_types"):
+		return level_mode.get_allowed_skill_types(fallback)
+	return fallback
 
 
 func allows_kill_recovery() -> bool:
@@ -588,7 +598,10 @@ func try_combine_skill() -> bool:
 func _try_store_exe_skill_component() -> bool:
 	var before_sizes: Array[int] = _synthesis_slot_sizes()
 	if not synthesis.press_space():
+		hud_message = synthesis.get_last_failure_reason()
+		_refresh_visuals()
 		return false
+	hud_message = ""
 	_sync_exe_skill_slots()
 	_record_new_exe_syntheses(before_sizes)
 	_record_slot_usage_sample()
@@ -956,6 +969,11 @@ func _draw() -> void:
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
 	draw_string(font, Vector2(side_x, 124.0), str(turn),
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color.WHITE)
+	if not hud_message.is_empty():
+		draw_string(font, Vector2(side_x, 160.0), "INFO",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))
+		draw_string(font, Vector2(side_x, 184.0), hud_message,
+			HORIZONTAL_ALIGNMENT_LEFT, 220.0, 14, Color(1.0, 0.82, 0.4))
 	if SHOW_SIDE_STATS:
 		draw_string(font, Vector2(side_x, 262.0), "KILL",
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Color(0.5, 0.5, 0.55))

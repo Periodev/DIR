@@ -17,6 +17,7 @@ const LEVELS := [
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA", "IMA"],
 		#MASR
 	},
 
@@ -35,6 +36,7 @@ const LEVELS := [
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA", "IMA"],
 		#AMSR
 	},
 
@@ -53,6 +55,7 @@ const LEVELS := [
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA", "IMA"],
 		#AMSR
 	},
 
@@ -70,6 +73,7 @@ E..
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA", "IMA"],
 		#MASR
 	},
 
@@ -88,6 +92,7 @@ E..
 		"move_limit": 1,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA", "IMA"],
 		#MASR
 	},
 	{
@@ -105,6 +110,7 @@ E...
 		"move_limit": 2,
 		"attack_limit": 1,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA", "IMA"],
 		#MMASR
 	},
 
@@ -124,6 +130,7 @@ E...
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA", "IMA"],
 		#MAMSRA
 	},
 
@@ -141,6 +148,7 @@ E...
 		"move_limit": 1,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA", "IMA"],
 		#MASRA
 	},
 
@@ -159,6 +167,7 @@ E...
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA", "IMA"],
 		#AMSRAMSR
 	},
 ]

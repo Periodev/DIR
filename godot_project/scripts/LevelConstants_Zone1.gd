@@ -15,6 +15,7 @@ E@E
 		"move_limit": 0,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA"],
 		#AASR
 	},
 
@@ -32,6 +33,7 @@ E@E
 		"move_limit": 0,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA"],
 		#AASR
 	},
 
@@ -48,6 +50,7 @@ EE@
 		"move_limit": 1,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA"],
 		#AASMR
 	},
 
@@ -64,6 +67,7 @@ E.@
 		"move_limit": 1,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA"],
 		#AMASR
 	},
 
@@ -81,6 +85,7 @@ E@E
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA"],
 		#AMMASR
 	},
 
@@ -98,6 +103,7 @@ E..
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA"],
 		#AMAMSR, MAMASR
 	},
 
@@ -115,6 +121,7 @@ E@.
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA"],
 		#AMASMR
 	},
 
@@ -133,6 +140,7 @@ E@..
 		"move_limit": 2,
 		"attack_limit": 2,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA"],
 		#AMASMR
 	},
 
@@ -150,6 +158,7 @@ E.EE
 		"move_limit": 2,
 		"attack_limit": 3,
 		"unlocked_slot_count": 1,
+		"allowed_skill_types": ["LAA"],
 		#AMASAMR
 	},
 ]

@@ -11,6 +11,8 @@ enum SlotStatus { EMPTY, PARTIAL, COMPLETE }
 var slots: Array = []
 var selected_slot: int = -1
 var input_buffer: RefCounted = _INPUT_BUFFER_SCRIPT.new()
+var allowed_skill_types: Dictionary = {}
+var last_failure_reason: String = ""
 
 
 func reset(slot_count: int) -> void:
@@ -19,6 +21,15 @@ func reset(slot_count: int) -> void:
 		slots.append([])
 	selected_slot = -1
 	input_buffer.clear()
+	last_failure_reason = ""
+
+
+func set_allowed_skill_types(skill_types: Array) -> void:
+	allowed_skill_types.clear()
+	for skill_type_name: Variant in skill_types:
+		for skill_type: int in skill_type_name_to_enums(str(skill_type_name)):
+			if skill_type != CharacterData.SkillType.NONE:
+				allowed_skill_types[skill_type] = true
 
 
 static func board_dir_to_core(dir: int) -> int:
@@ -157,7 +168,9 @@ func slot_can_accept(index: int, token: int) -> bool:
 		return token_is_attack(token)
 	if token_count != 1:
 		return false
-	return can_compose(slots[index][0], token)
+	if not can_compose(slots[index][0], token):
+		return false
+	return skill_type_allowed(classify_tokens([slots[index][0], token]))
 
 
 func slot_store(index: int, token: int) -> bool:
@@ -174,21 +187,32 @@ func can_store_in_slot(index: int, token: int = NO_TOKEN) -> bool:
 
 func press_space() -> bool:
 	if not has_pending():
+		last_failure_reason = "No pending vector to store."
 		return false
 	var slot_index: int = selected_slot
 	var token: int = NO_TOKEN
 	if slot_index >= 0:
 		token = get_pending_token_for_slot(slot_index)
-		if token == NO_TOKEN or not slot_store(slot_index, token):
+		if token == NO_TOKEN:
+			last_failure_reason = "Selected slot cannot accept current pending vector."
+			return false
+		if not slot_store(slot_index, token):
+			last_failure_reason = "Selected slot rejected that skill composition."
 			return false
 	else:
 		slot_index = _find_default_store_slot()
 		if slot_index < 0:
+			last_failure_reason = "No slot can accept the current pending vector."
 			return false
 		token = get_pending_token_for_slot(slot_index)
-		if token == NO_TOKEN or not slot_store(slot_index, token):
+		if token == NO_TOKEN:
+			last_failure_reason = "No valid vector-slot match found."
+			return false
+		if not slot_store(slot_index, token):
+			last_failure_reason = "Auto-selected slot rejected that skill composition."
 			return false
 	input_buffer.consume(token)
+	last_failure_reason = ""
 	return true
 
 
@@ -213,6 +237,10 @@ func auto_store_pending() -> bool:
 
 func can_cast_selected() -> bool:
 	return slot_status(selected_slot) == SlotStatus.COMPLETE
+
+
+func get_last_failure_reason() -> String:
+	return last_failure_reason
 
 
 func consume_selected_skill() -> Array:
@@ -244,6 +272,8 @@ func replace_complete_slot(index: int, first_board_dir: int, second_board_dir: i
 		first_token = token_code(TokenKind.ATTACK, second_core_dir)
 		second_token = token_code(TokenKind.MOVE, first_core_dir)
 	if not can_compose(first_token, second_token):
+		return false
+	if not skill_type_allowed(classify_tokens([first_token, second_token])):
 		return false
 	slots[index] = [first_token, second_token]
 	return true
@@ -288,10 +318,7 @@ static func can_compose(first_token: int, second_token: int) -> bool:
 static func classify_tokens(tokens: Array) -> int:
 	if tokens.size() != 2 or not can_compose(tokens[0], tokens[1]):
 		return CharacterData.SkillType.NONE
-	var d0: int = token_board_dir(tokens[0])
-	var d1: int = token_board_dir(tokens[1])
-	var first_is_attack: bool = token_is_attack(tokens[0])
-	return CharacterData.classify_skill([d0, d1, first_is_attack])
+	return CharacterData.classify_skill(tokens_to_legacy(tokens))
 
 
 static func tokens_to_legacy(tokens: Array) -> Array:
@@ -310,6 +337,28 @@ static func tokens_to_legacy(tokens: Array) -> Array:
 		token_board_dir(tokens[1]),
 		token_is_attack(tokens[0]),
 	]
+
+
+func skill_type_allowed(skill_type: int) -> bool:
+	if allowed_skill_types.is_empty():
+		return true
+	return allowed_skill_types.has(skill_type)
+
+
+static func skill_type_name_to_enums(skill_type_name: String) -> Array[int]:
+	match skill_type_name.to_upper():
+		"LAA":
+			return [CharacterData.SkillType.ORTHO_AA]
+		"IAA":
+			return [CharacterData.SkillType.SAME_AA]
+		"IMA":
+			return [CharacterData.SkillType.SAME_MA]
+		"LMA":
+			return [CharacterData.SkillType.LEFT_MA, CharacterData.SkillType.RIGHT_MA]
+		"RMA":
+			return [CharacterData.SkillType.RIGHT_MA]
+		_:
+			return []
 
 
 func _slot_index_valid(index: int) -> bool:

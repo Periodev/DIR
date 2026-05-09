@@ -1,0 +1,14 @@
+3-6 Weave
+resources: 2M / 3A, slots: 2, recovery: False
+search: max_steps=14, solution_limit=10
+solutions found: 10
+1. ML | AL | MU | AU | S2 | S2 | R2(IMA-R) | AU | S1 | R1(LAA-R/D)
+2. ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AU | S1 | R1(IAA-D)
+3. ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AD | S1 | R1(IMA-U)
+4. ML | AL | S1 | S1 | MU | AU | S2 | S2 | R1(IMA-R) | AU | R2(IMA-D)
+5. ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AU | S2 | S1 | R1(IMA-D)
+6. ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AU | S2 | S2 | R2(IMA-D)
+7. ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AD | S1 | S2 | R1(IMA-U)
+8. AR | ML | AL | S2 | S2 | MU | AU | R2(IMA-R) | S2 | S2 | R2(IMA-U)
+9. ML | AL | S1 | S1 | MU | AU | S2 | S2 | R1(IMA-R) | AD | S1 | R2(IMA-U)
+10. AR | S2 | ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | S1 | S1 | R1(IMA-U)

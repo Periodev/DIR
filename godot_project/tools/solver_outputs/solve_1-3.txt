@@ -1,0 +1,5 @@
+1-3 Reposition
+resources: 1M / 2A, slots: 1, recovery: False
+search: max_steps=14, solution_limit=10
+solutions found: 1
+1. AU | AL | ML | R1(LAA-U/L)

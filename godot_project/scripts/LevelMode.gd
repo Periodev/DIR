@@ -28,6 +28,10 @@ func get_unlocked_slot_count(fallback: int) -> int:
 	return fallback
 
 
+func get_allowed_skill_types(fallback: Array = []) -> Array:
+	return fallback
+
+
 func allows_kill_recovery() -> bool:
 	return true
 

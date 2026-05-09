@@ -59,6 +59,12 @@ func get_unlocked_slot_count(fallback: int) -> int:
 	return int(level_data.get("unlocked_slot_count", fallback))
 
 
+func get_allowed_skill_types(fallback: Array = []) -> Array:
+	if level_data.has("allowed_skill_types"):
+		return Array(level_data.get("allowed_skill_types", fallback)).duplicate(true)
+	return fallback
+
+
 func allows_kill_recovery() -> bool:
 	if level_data.has("kill_recovery_enabled"):
 		return bool(level_data.get("kill_recovery_enabled", false))

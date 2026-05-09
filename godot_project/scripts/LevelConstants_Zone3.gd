@@ -18,6 +18,7 @@ E...
 		"attack_limit": 2,
 		"unlocked_slot_count": 2,
 		"kill_recovery_enabled": false,
+		"allowed_skill_types": ["LAA", "IMA", "IAA", "LMA"],
 		#AAMSRMSR
 	},
 
@@ -37,6 +38,7 @@ EE.
 		"attack_limit": 3,
 		"unlocked_slot_count": 2,
 		"kill_recovery_enabled": false,
+		"allowed_skill_types": ["LAA", "IMA", "IAA", "LMA"],
 		#AMSAASRR
 	},
 
@@ -55,6 +57,7 @@ EEE
 		"attack_limit": 3,
 		"unlocked_slot_count": 2,
 		"kill_recovery_enabled": false,
+		"allowed_skill_types": ["LAA", "IMA", "IAA", "LMA"],
 		#AASMASRR, AAMSASRR
 	},
 
@@ -74,6 +77,7 @@ EE@
 		"attack_limit": 3,
 		"unlocked_slot_count": 2,
 		"kill_recovery_enabled": false,
+		"allowed_skill_types": ["LAA", "IMA", "IAA", "LMA"],
 		#AASAMSRR
 	},
 
@@ -94,6 +98,7 @@ EE@
 		"attack_limit": 3,
 		"unlocked_slot_count": 2,
 		"kill_recovery_enabled": false,
+		"allowed_skill_types": ["LAA", "IMA", "IAA", "LMA"],
 		#AMSARASR
 	},
 
@@ -112,7 +117,8 @@ E.@E
 		"attack_limit": 3,
 		"unlocked_slot_count": 2,
 		"kill_recovery_enabled": false,
-		#MAMASRASR, AMASMASRR
+		"allowed_skill_types": ["LAA", "IMA", "IAA", "LMA"],
+		#MAMASRASR, MASMARASR, AMASMASRR
 	},
 
 
