@@ -1,7 +1,5 @@
-3-4 Hold
+3-4 Crowded
 resources: 1M / 3A, slots: 2, recovery: False
 search: max_steps=14, solution_limit=10
-solutions found: 3
-1. AU | AD | AL | MU | S1 | R1(IMA-L) | R2(LAA-R/D)
-2. AU | AD | AL | ML | S1 | R2(LAA-U/L) | R1(LMA-U/L)
-3. AU | AD | AL | ML | S1 | R2(LAA-U/L) | R1(LMA-L/U)
+solutions found: 1
+1. AU | AR | MU | AU | S1 | S2 | R1(IMA-R) | R2(LAA-U/R)

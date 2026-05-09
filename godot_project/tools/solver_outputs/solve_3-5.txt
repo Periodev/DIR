@@ -1,5 +1,5 @@
-3-5 Brake
+3-5 Hold
 resources: 1M / 3A, slots: 2, recovery: False
 search: max_steps=14, solution_limit=10
 solutions found: 1
-1. AR | MR | AU | AD | S1 | S2 | R2(LMA-D/R) | R1(LAA-R/D)
+1. AU | AD | AL | MU | S1 | R1(IMA-L) | R2(LAA-R/D)

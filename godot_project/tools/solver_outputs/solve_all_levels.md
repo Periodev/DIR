@@ -1,7 +1,7 @@
 # All ASCII Tutorial Levels
 
 - search: `max_steps=14`, `solution_limit=10`
-- levels: `24`
+- levels: `25`
 
 | Code | Title | Zone | Resources | Slots | Allowed | Solutions | Status | Representative |
 | --- | --- | ---: | --- | ---: | --- | ---: | --- | --- |
@@ -23,9 +23,10 @@
 | 2-7 | Dash | 2 | 2M/2A | 1 | IMA,LAA | 1 | ok | MU \| AR \| MR \| S1 \| R1(IMA-U) \| AR |
 | 2-8 | Step | 2 | 1M/2A | 1 | IMA,LAA | 1 | ok | MR \| AR \| S1 \| S1 \| R1(IMA-U) \| AR |
 | 2-9 | Pivot | 2 | 2M/2A | 1 | IMA,LAA | 1 | ok | AR \| MR \| S1 \| R1(IMA-U) \| AU \| MU \| S1 \| R1(IMA-R) |
-| 3-1 | Jump | 3 | 2M/2A | 2 | IAA,IMA,LAA,LMA | 3 | ok | AU \| AR \| MU \| S1 \| MU \| S2 \| R1(IMA-R) \| R2(LMA-U/R) |
-| 3-2 | Cut in | 3 | 1M/3A | 2 | IAA,IMA,LAA,LMA | 1 | ok | AR \| MR \| AR \| AD \| S1 \| S2 \| R2(IMA-D) \| R1(LAA-D/L) |
-| 3-3 | Crowded | 3 | 1M/3A | 2 | IAA,IMA,LAA,LMA | 2 | ok | AU \| AR \| MU \| AU \| S1 \| S2 \| R1(IAA-R) \| R2(LMA-U/R) |
-| 3-4 | Hold | 3 | 1M/3A | 2 | IAA,IMA,LAA,LMA | 3 | ok | AU \| AD \| AL \| MU \| S1 \| R1(IMA-L) \| R2(LAA-R/D) |
-| 3-5 | Brake | 3 | 1M/3A | 2 | IAA,IMA,LAA,LMA | 1 | ok | AR \| MR \| AU \| AD \| S1 \| S2 \| R2(LMA-D/R) \| R1(LAA-R/D) |
-| 3-6 | Weave | 3 | 2M/3A | 2 | IAA,IMA,LAA,LMA | 10 | ok | ML \| AL \| MU \| AU \| S2 \| S2 \| R2(IMA-R) \| AU \| S1 \| R1(LAA-R/D) |
+| 3-1 | Jump | 3 | 2M/2A | 2 | IMA,LAA | 1 | ok | AU \| AR \| MU \| S1 \| MR \| S2 \| R1(IMA-U) \| R2(IMA-R) |
+| 3-2 | Hop | 3 | 2M/2A | 2 | IMA,LAA | 1 | ok | AU \| AR \| MR \| S2 \| R2(IMA-U) \| MU \| S1 \| R1(IMA-R) |
+| 3-3 | Cut in | 3 | 1M/3A | 2 | IMA,LAA | 1 | ok | AR \| MR \| AR \| AD \| S1 \| S2 \| R2(IMA-D) \| R1(LAA-D/L) |
+| 3-4 | Crowded | 3 | 1M/3A | 2 | IMA,LAA | 1 | ok | AU \| AR \| MU \| AU \| S1 \| S2 \| R1(IMA-R) \| R2(LAA-U/R) |
+| 3-5 | Hold | 3 | 1M/3A | 2 | IMA,LAA | 1 | ok | AU \| AD \| AL \| MU \| S1 \| R1(IMA-L) \| R2(LAA-R/D) |
+| 3-6 | Reserve | 3 | 1M/3A | 2 | IMA,LAA | 1 | ok | AR \| MR \| S1 \| AU \| R1(IMA-D) \| AR \| S1 \| R1(LAA-R/D) |
+| 3-7 | Weave | 3 | 2M/3A | 2 | IMA,LAA | 10 | ok | ML \| AL \| MU \| AU \| S2 \| S2 \| R2(IMA-R) \| AU \| S1 \| R1(LAA-R/D) |

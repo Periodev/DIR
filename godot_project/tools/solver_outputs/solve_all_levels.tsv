@@ -21,23 +21,19 @@ code	title	zone	resources	slots	allowed	solution_count	status	solution_index	sol
 2-7	Dash	2	2M/2A	1	IMA,LAA	1	ok	1	MU | AR | MR | S1 | R1(IMA-U) | AR	D:\DIR_02\godot_project\tools\solver_outputs\solve_2-7.txt
 2-8	Step	2	1M/2A	1	IMA,LAA	1	ok	1	MR | AR | S1 | S1 | R1(IMA-U) | AR	D:\DIR_02\godot_project\tools\solver_outputs\solve_2-8.txt
 2-9	Pivot	2	2M/2A	1	IMA,LAA	1	ok	1	AR | MR | S1 | R1(IMA-U) | AU | MU | S1 | R1(IMA-R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_2-9.txt
-3-1	Jump	3	2M/2A	2	IAA,IMA,LAA,LMA	3	ok	1	AU | AR | MU | S1 | MU | S2 | R1(IMA-R) | R2(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-1.txt
-3-1	Jump	3	2M/2A	2	IAA,IMA,LAA,LMA	3	ok	2	AU | AR | MU | S1 | MU | S2 | R1(IMA-R) | R2(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-1.txt
-3-1	Jump	3	2M/2A	2	IAA,IMA,LAA,LMA	3	ok	3	AU | AR | MU | S1 | MR | S2 | R1(IMA-U) | R2(IMA-R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-1.txt
-3-2	Cut in	3	1M/3A	2	IAA,IMA,LAA,LMA	1	ok	1	AR | MR | AR | AD | S1 | S2 | R2(IMA-D) | R1(LAA-D/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-2.txt
-3-3	Crowded	3	1M/3A	2	IAA,IMA,LAA,LMA	2	ok	1	AU | AR | MU | AU | S1 | S2 | R1(IAA-R) | R2(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-3.txt
-3-3	Crowded	3	1M/3A	2	IAA,IMA,LAA,LMA	2	ok	2	AU | AR | MU | AU | S1 | S2 | R1(IAA-R) | R2(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-3.txt
-3-4	Hold	3	1M/3A	2	IAA,IMA,LAA,LMA	3	ok	1	AU | AD | AL | MU | S1 | R1(IMA-L) | R2(LAA-R/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-4.txt
-3-4	Hold	3	1M/3A	2	IAA,IMA,LAA,LMA	3	ok	2	AU | AD | AL | ML | S1 | R2(LAA-U/L) | R1(LMA-U/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-4.txt
-3-4	Hold	3	1M/3A	2	IAA,IMA,LAA,LMA	3	ok	3	AU | AD | AL | ML | S1 | R2(LAA-U/L) | R1(LMA-L/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-4.txt
-3-5	Brake	3	1M/3A	2	IAA,IMA,LAA,LMA	1	ok	1	AR | MR | AU | AD | S1 | S2 | R2(LMA-D/R) | R1(LAA-R/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-5.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	1	ML | AL | MU | AU | S2 | S2 | R2(IMA-R) | AU | S1 | R1(LAA-R/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	2	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AU | S1 | R1(IAA-D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	3	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AD | S1 | R1(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	4	ML | AL | S1 | S1 | MU | AU | S2 | S2 | R1(IMA-R) | AU | R2(IMA-D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	5	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AU | S2 | S1 | R1(IMA-D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	6	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AU | S2 | S2 | R2(IMA-D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	7	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AD | S1 | S2 | R1(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	8	AR | ML | AL | S2 | S2 | MU | AU | R2(IMA-R) | S2 | S2 | R2(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	9	ML | AL | S1 | S1 | MU | AU | S2 | S2 | R1(IMA-R) | AD | S1 | R2(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
-3-6	Weave	3	2M/3A	2	IAA,IMA,LAA,LMA	10	ok	10	AR | S2 | ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | S1 | S1 | R1(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
+3-1	Jump	3	2M/2A	2	IMA,LAA	1	ok	1	AU | AR | MU | S1 | MR | S2 | R1(IMA-U) | R2(IMA-R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-1.txt
+3-2	Hop	3	2M/2A	2	IMA,LAA	1	ok	1	AU | AR | MR | S2 | R2(IMA-U) | MU | S1 | R1(IMA-R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-2.txt
+3-3	Cut in	3	1M/3A	2	IMA,LAA	1	ok	1	AR | MR | AR | AD | S1 | S2 | R2(IMA-D) | R1(LAA-D/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-3.txt
+3-4	Crowded	3	1M/3A	2	IMA,LAA	1	ok	1	AU | AR | MU | AU | S1 | S2 | R1(IMA-R) | R2(LAA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-4.txt
+3-5	Hold	3	1M/3A	2	IMA,LAA	1	ok	1	AU | AD | AL | MU | S1 | R1(IMA-L) | R2(LAA-R/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-5.txt
+3-6	Reserve	3	1M/3A	2	IMA,LAA	1	ok	1	AR | MR | S1 | AU | R1(IMA-D) | AR | S1 | R1(LAA-R/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-6.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	1	ML | AL | MU | AU | S2 | S2 | R2(IMA-R) | AU | S1 | R1(LAA-R/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	2	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AU | S1 | R1(IMA-D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	3	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AD | S1 | R1(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	4	AR | ML | AL | S2 | S2 | MU | AU | S1 | R2(IMA-R) | R1(LAA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	5	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AU | S1 | S2 | R1(IMA-D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	6	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AU | S2 | S2 | R2(IMA-D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	7	ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | AD | S1 | S2 | R1(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	8	AR | ML | AL | S2 | S2 | MU | AU | R2(IMA-R) | S2 | S2 | R2(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	9	ML | AL | S1 | S1 | MU | AU | S2 | S2 | R1(IMA-R) | AD | S1 | R2(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	10	AR | S2 | ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | S1 | S1 | R1(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt

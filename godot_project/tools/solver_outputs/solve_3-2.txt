@@ -1,5 +1,5 @@
-3-2 Cut in
-resources: 1M / 3A, slots: 2, recovery: False
+3-2 Hop
+resources: 2M / 2A, slots: 2, recovery: False
 search: max_steps=14, solution_limit=10
 solutions found: 1
-1. AR | MR | AR | AD | S1 | S2 | R2(IMA-D) | R1(LAA-D/L)
+1. AU | AR | MR | S2 | R2(IMA-U) | MU | S1 | R1(IMA-R)
