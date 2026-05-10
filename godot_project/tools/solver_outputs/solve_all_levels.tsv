@@ -63,3 +63,5 @@ code	title	zone	resources	slots	allowed	solution_count	status	solution_index	sol
 4-8	Spiral	4	2M/2A	2	LMA	4	ok	2	AD | MU | AR | S2 | S2 | ML | S1 | R1(LMA-L/D) | R2(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-8.txt
 4-8	Spiral	4	2M/2A	2	LMA	4	ok	3	MU | AR | S1 | S1 | ML | AU | S2 | S2 | R1(LMA-D/L) | R2(LMA-R/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-8.txt
 4-8	Spiral	4	2M/2A	2	LMA	4	ok	4	MU | AR | S1 | S1 | ML | AU | S2 | S2 | R1(LMA-D/L) | R2(LMA-D/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-8.txt
+4-9	Zig	4	2M/2A	2	IMA,LAA,LMA	2	ok	1	MU | AL | S1 | S1 | R1(LMA-L/U) | AL | ML | S1 | R1(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-9.txt
+4-9	Zig	4	2M/2A	2	IMA,LAA,LMA	2	ok	2	MU | AL | S1 | S1 | ML | AU | S2 | S2 | R1(LMA-U/L) | R2(LMA-D/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-9.txt

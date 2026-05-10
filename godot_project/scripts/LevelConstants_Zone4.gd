@@ -162,4 +162,23 @@ E.@.
 		"allowed_skill_types": ["LMA"],
 		# MU AR ML AU SRD SRR
 	},
+
+	{
+		"zone": 4,
+		"index": 9,
+		"code": "4-9",
+		"title": "Zig",
+		"object_map": """
+EE.
+EE.
+..@
+""",
+		"direction_map": "",
+		"move_limit": 2,
+		"attack_limit": 2,
+		"unlocked_slot_count": 2,
+		"kill_recovery_enabled": false,
+		"allowed_skill_types": ["LAA", "IMA", "LMA"],
+		# MU AL ML AU SRR SRD
+	},
 ]

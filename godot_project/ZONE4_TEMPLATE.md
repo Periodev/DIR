@@ -191,6 +191,32 @@ Suggested solution:
 - `S`
 - `R-right`
 
+### 4-9 Zig
+
+Goal:
+- Introduce a compressed cross-start review with old skills available.
+- The opening reads as alternating move/attack directions instead of same-axis material collection.
+
+```text
+EE.
+EE.
+..@
+```
+
+Suggested solution:
+- `M-up`
+- `A-left`
+- `M-left`
+- `A-up`
+- `S`
+- `R-right`
+- `S`
+- `R-down`
+
+Note:
+- With `LMA` only this is a double-LMA compression.
+- With `LAA`, `IMA`, and `LMA` open, one solution naturally becomes `LMA` cut-in plus `IMA` line cleanup.
+
 Later variants can use a fixed-handed `LMA` cycle to sweep diagonal corner
 targets around a center point.
 

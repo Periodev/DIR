@@ -1,7 +1,7 @@
 # All ASCII Tutorial Levels
 
 - search: `max_steps=16`, `solution_limit=10`
-- levels: `33`
+- levels: `34`
 
 | Code | Title | Zone | Resources | Slots | Allowed | Solutions | Status | Representative |
 | --- | --- | ---: | --- | ---: | --- | ---: | --- | --- |
@@ -38,3 +38,4 @@
 | 4-6 | Landing | 4 | 1M/2A | 2 | LMA | 1 | ok | MU \| AL \| S1 \| S1 \| R1(LMA-U/R) \| AU |
 | 4-7 | Arc | 4 | 1M/2A | 2 | LMA | 1 | ok | ML \| AU \| S1 \| S1 \| R1(LMA-D/L) \| AD |
 | 4-8 | Spiral | 4 | 2M/2A | 2 | LMA | 4 | ok | AD \| MU \| AR \| S2 \| S2 \| ML \| S1 \| R1(LMA-L/D) \| R2(LMA-U/R) |
+| 4-9 | Zig | 4 | 2M/2A | 2 | IMA,LAA,LMA | 2 | ok | MU \| AL \| S1 \| S1 \| R1(LMA-L/U) \| AL \| ML \| S1 \| R1(IMA-U) |
