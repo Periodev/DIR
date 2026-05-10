@@ -1,6 +1,6 @@
 All ASCII tutorial levels
 search: max_steps=16, solution_limit=10
-levels: 34
+levels: 35
 
 1-1 L-Strike | 0M/2A | slots=1 | solutions=1 | ok
   1. AU | AR | S1 | R1(LAA-U/L)
@@ -104,3 +104,6 @@ levels: 34
 4-9 Zig | 2M/2A | slots=2 | solutions=2 | ok
   1. MU | AL | S1 | S1 | R1(LMA-L/U) | AL | ML | S1 | R1(IMA-U)
   file: D:\DIR_02\godot_project\tools\solver_outputs\solve_4-9.txt
+4-10 Miss | 2M/2A | slots=2 | solutions=2 | ok
+  1. MU | AL | S1 | S1 | MR | R1(LMA-U/R) | AU | S1 | S1 | R1(LMA-U/R)
+  file: D:\DIR_02\godot_project\tools\solver_outputs\solve_4-10.txt

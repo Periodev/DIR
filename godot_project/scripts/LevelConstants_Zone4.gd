@@ -181,4 +181,24 @@ EE.
 		"allowed_skill_types": ["LAA", "IMA", "LMA"],
 		# MU AL ML AU SRR SRD
 	},
+
+	{
+		"zone": 4,
+		"index": 10,
+		"code": "4-10",
+		"title": "Miss",
+		"object_map": """
+..EE
+....
+E...
+.@..
+""",
+		"direction_map": "",
+		"move_limit": 2,
+		"attack_limit": 2,
+		"unlocked_slot_count": 2,
+		"kill_recovery_enabled": false,
+		"allowed_skill_types": ["LAA", "IMA", "LMA"],
+		# MU AL SRR MR AU SRR
+	},
 ]

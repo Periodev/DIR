@@ -217,6 +217,29 @@ Note:
 - With `LMA` only this is a double-LMA compression.
 - With `LAA`, `IMA`, and `LMA` open, one solution naturally becomes `LMA` cut-in plus `IMA` line cleanup.
 
+### 4-10 Miss
+
+Goal:
+- Teach that an `LMA` can intentionally miss while still preserving value through its movement.
+- The top-right pair is an intentional decoy: the useful play is to avoid greedily taking the nearest visible target and instead preserve the next center and material for the second cast.
+
+```text
+..EE
+....
+E...
+.@..
+```
+
+Suggested solution:
+- `M-up`
+- `A-left`
+- `S`
+- `R-right`
+- `M-right`
+- `A-up`
+- `S`
+- `R-right`
+
 Later variants can use a fixed-handed `LMA` cycle to sweep diagonal corner
 targets around a center point.
 
