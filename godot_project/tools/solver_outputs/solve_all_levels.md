@@ -1,7 +1,7 @@
 # All ASCII Tutorial Levels
 
-- search: `max_steps=14`, `solution_limit=10`
-- levels: `28`
+- search: `max_steps=16`, `solution_limit=10`
+- levels: `33`
 
 | Code | Title | Zone | Resources | Slots | Allowed | Solutions | Status | Representative |
 | --- | --- | ---: | --- | ---: | --- | ---: | --- | --- |
@@ -30,6 +30,11 @@
 | 3-5 | Hold | 3 | 1M/3A | 2 | IMA,LAA | 1 | ok | AU \| AD \| AL \| MU \| S1 \| R1(IMA-L) \| R2(LAA-R/D) |
 | 3-6 | Reserve | 3 | 1M/3A | 2 | IMA,LAA | 1 | ok | AR \| MR \| S1 \| AU \| R1(IMA-D) \| AR \| S1 \| R1(LAA-R/D) |
 | 3-7 | Weave | 3 | 2M/3A | 2 | IMA,LAA | 10 | ok | ML \| AL \| MU \| AU \| S2 \| S2 \| R2(IMA-R) \| AU \| S1 \| R1(LAA-R/D) |
-| 4-1 | Sidestep Strike | 4 | 1M/1A | 1 | LMA | 2 | ok | MU \| AL \| S1 \| S1 \| R1(LMA-U/L) |
-| 4-2 | Turn Pursuit | 4 | 1M/1A | 1 | LMA | 2 | ok | MU \| AL \| S1 \| S1 \| R1(LMA-U/R) |
-| 4-3 | Corner Pursuit | 4 | 1M/1A | 1 | LMA | 2 | ok | AR \| MU \| S1 \| R1(LMA-U/L) |
+| 4-1 | Sidestep Strike | 4 | 1M/1A | 2 | LMA | 2 | ok | MU \| AL \| S1 \| S1 \| R1(LMA-U/L) |
+| 4-2 | Turn Pursuit | 4 | 1M/1A | 2 | LMA | 2 | ok | MU \| AL \| S1 \| S1 \| R1(LMA-U/R) |
+| 4-3 | Corner Pursuit | 4 | 1M/1A | 2 | LMA | 2 | ok | AR \| MU \| S1 \| R1(LMA-U/L) |
+| 4-4 | Clear | 4 | 1M/2A | 2 | LMA | 4 | ok | AU \| AL \| MU \| S2 \| R2(LMA-U/R) |
+| 4-5 | Return | 4 | 2M/1A | 2 | LMA | 10 | ok | MU \| AR \| MD \| S1 \| R1(LMA-D/L) |
+| 4-6 | Landing | 4 | 1M/2A | 2 | LMA | 1 | ok | MU \| AL \| S1 \| S1 \| R1(LMA-U/R) \| AU |
+| 4-7 | Arc | 4 | 1M/2A | 2 | LMA | 1 | ok | ML \| AU \| S1 \| S1 \| R1(LMA-D/L) \| AD |
+| 4-8 | Spiral | 4 | 2M/2A | 2 | LMA | 4 | ok | AD \| MU \| AR \| S2 \| S2 \| ML \| S1 \| R1(LMA-L/D) \| R2(LMA-U/R) |

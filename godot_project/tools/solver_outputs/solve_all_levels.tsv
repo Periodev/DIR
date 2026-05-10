@@ -37,9 +37,29 @@ code	title	zone	resources	slots	allowed	solution_count	status	solution_index	sol
 3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	8	AR | ML | AL | S2 | S2 | MU | AU | R2(IMA-R) | S2 | S2 | R2(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
 3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	9	ML | AL | S1 | S1 | MU | AU | S2 | S2 | R1(IMA-R) | AD | S1 | R2(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
 3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	10	AR | S2 | ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | S1 | S1 | R1(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
-4-1	Sidestep Strike	4	1M/1A	1	LMA	2	ok	1	MU | AL | S1 | S1 | R1(LMA-U/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-1.txt
-4-1	Sidestep Strike	4	1M/1A	1	LMA	2	ok	2	MU | AL | S1 | S1 | R1(LMA-L/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-1.txt
-4-2	Turn Pursuit	4	1M/1A	1	LMA	2	ok	1	MU | AL | S1 | S1 | R1(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-2.txt
-4-2	Turn Pursuit	4	1M/1A	1	LMA	2	ok	2	MU | AL | S1 | S1 | R1(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-2.txt
-4-3	Corner Pursuit	4	1M/1A	1	LMA	2	ok	1	AR | MU | S1 | R1(LMA-U/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-3.txt
-4-3	Corner Pursuit	4	1M/1A	1	LMA	2	ok	2	AR | MU | S1 | R1(LMA-L/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-3.txt
+4-1	Sidestep Strike	4	1M/1A	2	LMA	2	ok	1	MU | AL | S1 | S1 | R1(LMA-U/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-1.txt
+4-1	Sidestep Strike	4	1M/1A	2	LMA	2	ok	2	MU | AL | S1 | S1 | R1(LMA-L/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-1.txt
+4-2	Turn Pursuit	4	1M/1A	2	LMA	2	ok	1	MU | AL | S1 | S1 | R1(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-2.txt
+4-2	Turn Pursuit	4	1M/1A	2	LMA	2	ok	2	MU | AL | S1 | S1 | R1(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-2.txt
+4-3	Corner Pursuit	4	1M/1A	2	LMA	2	ok	1	AR | MU | S1 | R1(LMA-U/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-3.txt
+4-3	Corner Pursuit	4	1M/1A	2	LMA	2	ok	2	AR | MU | S1 | R1(LMA-L/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-3.txt
+4-4	Clear	4	1M/2A	2	LMA	4	ok	1	AU | AL | MU | S2 | R2(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-4.txt
+4-4	Clear	4	1M/2A	2	LMA	4	ok	2	AU | AL | MU | S2 | R2(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-4.txt
+4-4	Clear	4	1M/2A	2	LMA	4	ok	3	AL | AU | MU | S1 | R1(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-4.txt
+4-4	Clear	4	1M/2A	2	LMA	4	ok	4	AL | AU | MU | S1 | R1(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-4.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	1	MU | AR | MD | S1 | R1(LMA-D/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	2	MU | AR | MD | S1 | R1(LMA-L/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	3	MD | AL | MU | S1 | R1(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	4	MD | AL | MU | S1 | R1(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	5	MU | AR | S1 | S1 | MD | R1(LMA-D/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	6	MU | AR | S1 | S1 | MD | R1(LMA-L/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	7	MR | AU | S1 | S1 | ML | R1(LMA-D/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	8	MR | AU | S1 | S1 | ML | R1(LMA-L/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	9	MD | AL | S1 | S1 | MU | R1(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-5	Return	4	2M/1A	2	LMA	10	ok	10	MD | AL | S1 | S1 | MU | R1(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-5.txt
+4-6	Landing	4	1M/2A	2	LMA	1	ok	1	MU | AL | S1 | S1 | R1(LMA-U/R) | AU	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-6.txt
+4-7	Arc	4	1M/2A	2	LMA	1	ok	1	ML | AU | S1 | S1 | R1(LMA-D/L) | AD	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-7.txt
+4-8	Spiral	4	2M/2A	2	LMA	4	ok	1	AD | MU | AR | S2 | S2 | ML | S1 | R1(LMA-L/D) | R2(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-8.txt
+4-8	Spiral	4	2M/2A	2	LMA	4	ok	2	AD | MU | AR | S2 | S2 | ML | S1 | R1(LMA-L/D) | R2(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-8.txt
+4-8	Spiral	4	2M/2A	2	LMA	4	ok	3	MU | AR | S1 | S1 | ML | AU | S2 | S2 | R1(LMA-D/L) | R2(LMA-R/D)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-8.txt
+4-8	Spiral	4	2M/2A	2	LMA	4	ok	4	MU | AR | S1 | S1 | ML | AU | S2 | S2 | R1(LMA-D/L) | R2(LMA-D/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-8.txt

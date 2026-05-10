@@ -20,13 +20,13 @@ Comment:
 ## Zone 4 Rule Frame
 
 Current baseline:
-- Slots: start back at `1`
+- Slots: start back at `2`
 - 4-1 onward uses `LMA` only until the new geometry is stable.
 - Kill recovery: `false`
 
 Reason:
 - Zone 4 should feel like a reset in local complexity, not `Zone 3 plus one more rule`.
-- Reintroducing one-slot structure lets the new skill be understood for its own shape before being recombined with two-slot timing problems again.
+- Keeping two slots preserves the Zone 3 slot literacy while reducing local pressure through simpler `LMA` boards.
 
 ## Curriculum Skeleton
 
@@ -86,20 +86,115 @@ Suggested solution:
 - `S`
 - `R-up`
 
-### 4-4 Exam
+### 4-4 Clear
 
 Goal:
-- Mix same-direction pursuit, left-hand `LMA`, and right-hand `LMA`.
-- Keep `1M / 1A` unless the exam needs an extra target to prevent a shortcut.
-- Avoid targets that can be solved by a straight `IMA` line unless the contrast is intentional.
+- Use the extra attack to clear local space before completing `LMA`.
+- Keep the final target tied to the same 9-grid pursuit model.
 
-Status:
-- Map not fixed yet.
+```text
+..E
+.E.
+E@.
+```
+
+Suggested solution:
+- `A-left`
+- `A-up`
+- `M-up`
+- `S`
+- `R-right`
+
+### 4-5 Return
+
+Goal:
+- Use the extra move as a return-to-center step.
+- Teach that not every `M` is only LMA material; one move can reposition before release.
+
+```text
+..E
+.@.
+E..
+```
+
+Suggested solution:
+- `M-up`
+- `A-right`
+- `M-down`
+- `S`
+- `R-down`
+
+Note:
+- This shape intentionally has multiple equivalent routes under `2M / 1A`.
+- The lesson is not uniqueness; it is recognizing that the extra move can restore the release center.
+
+### 4-6 Landing
+
+Goal:
+- Introduce LMA as movement utility.
+- The LMA hit still matters, but the important lesson is the final standing position enabling a basic attack.
+
+```text
+.E.
+...
+E..
+.@.
+```
+
+Suggested solution:
+- `M-up`
+- `A-left`
+- `S`
+- `R-up`
+- `A-up`
+
+### 4-7 Arc
+
+Goal:
+- Preview the first half of the later spiral pattern.
+- Use one `LMA` arc to reposition, then spend the extra attack as a follow-up hit.
+
+```text
+.E.
+..@
+E..
+.E.
+```
+
+Suggested solution:
+- `M-left`
+- `A-up`
+- `S`
+- `R-down`
+- `A-down`
+
+### 4-8 Spiral
+
+Goal:
+- Chain two `LMA` casts in sequence.
+- This is still one-slot play: synthesize, release, then synthesize and release again.
+
+```text
+.E..
+...E
+E.@.
+..E.
+```
+
+Suggested solution:
+- `M-up`
+- `A-right`
+- `S`
+- `M-left`
+- `A-up`
+- `R-down`
+- `S`
+- `R-right`
 
 Later variants can use a fixed-handed `LMA` cycle to sweep diagonal corner
 targets around a center point.
 
-### 4-5 Comparison With IMA
+### Later: Comparison With IMA
 
 Goal:
 - Contrast `LMA` with `IMA`.
@@ -109,7 +204,7 @@ Suggested frame:
 - `allowed_skill_types`: `["LAA", "IMA", "LMA"]`
 - Still prefer one-slot structure if possible.
 
-### 4-6 First Mixed Application
+### Later: First Mixed Application
 
 Goal:
 - Require the player to identify when `LMA` is the correct tool instead of `IMA`.
@@ -136,7 +231,7 @@ Use this dictionary shape when authoring concrete levels:
 	"direction_map": "",
 	"move_limit": 1,
 	"attack_limit": 1,
-	"unlocked_slot_count": 1,
+	"unlocked_slot_count": 2,
 	"kill_recovery_enabled": false,
 	"allowed_skill_types": ["LAA", "IMA", "LMA"],
 }
