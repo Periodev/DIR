@@ -1,0 +1,6 @@
+4-2 Turn Pursuit
+resources: 1M / 1A, slots: 1, recovery: False
+search: max_steps=14, solution_limit=10
+solutions found: 2
+1. MU | AL | S1 | S1 | R1(LMA-U/R)
+2. MU | AL | S1 | S1 | R1(LMA-R/U)

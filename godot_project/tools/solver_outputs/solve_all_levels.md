@@ -1,7 +1,7 @@
 # All ASCII Tutorial Levels
 
 - search: `max_steps=14`, `solution_limit=10`
-- levels: `25`
+- levels: `28`
 
 | Code | Title | Zone | Resources | Slots | Allowed | Solutions | Status | Representative |
 | --- | --- | ---: | --- | ---: | --- | ---: | --- | --- |
@@ -30,3 +30,6 @@
 | 3-5 | Hold | 3 | 1M/3A | 2 | IMA,LAA | 1 | ok | AU \| AD \| AL \| MU \| S1 \| R1(IMA-L) \| R2(LAA-R/D) |
 | 3-6 | Reserve | 3 | 1M/3A | 2 | IMA,LAA | 1 | ok | AR \| MR \| S1 \| AU \| R1(IMA-D) \| AR \| S1 \| R1(LAA-R/D) |
 | 3-7 | Weave | 3 | 2M/3A | 2 | IMA,LAA | 10 | ok | ML \| AL \| MU \| AU \| S2 \| S2 \| R2(IMA-R) \| AU \| S1 \| R1(LAA-R/D) |
+| 4-1 | Sidestep Strike | 4 | 1M/1A | 1 | LMA | 2 | ok | MU \| AL \| S1 \| S1 \| R1(LMA-U/L) |
+| 4-2 | Turn Pursuit | 4 | 1M/1A | 1 | LMA | 2 | ok | MU \| AL \| S1 \| S1 \| R1(LMA-U/R) |
+| 4-3 | Corner Pursuit | 4 | 1M/1A | 1 | LMA | 2 | ok | AR \| MU \| S1 \| R1(LMA-U/L) |

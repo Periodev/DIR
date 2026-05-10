@@ -1,6 +1,6 @@
 All ASCII tutorial levels
 search: max_steps=14, solution_limit=10
-levels: 25
+levels: 28
 
 1-1 L-Strike | 0M/2A | slots=1 | solutions=1 | ok
   1. AU | AR | S1 | R1(LAA-U/L)
@@ -77,3 +77,12 @@ levels: 25
 3-7 Weave | 2M/3A | slots=2 | solutions=10 | ok
   1. ML | AL | MU | AU | S2 | S2 | R2(IMA-R) | AU | S1 | R1(LAA-R/D)
   file: D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+4-1 Sidestep Strike | 1M/1A | slots=1 | solutions=2 | ok
+  1. MU | AL | S1 | S1 | R1(LMA-U/L)
+  file: D:\DIR_02\godot_project\tools\solver_outputs\solve_4-1.txt
+4-2 Turn Pursuit | 1M/1A | slots=1 | solutions=2 | ok
+  1. MU | AL | S1 | S1 | R1(LMA-U/R)
+  file: D:\DIR_02\godot_project\tools\solver_outputs\solve_4-2.txt
+4-3 Corner Pursuit | 1M/1A | slots=1 | solutions=2 | ok
+  1. AR | MU | S1 | R1(LMA-U/L)
+  file: D:\DIR_02\godot_project\tools\solver_outputs\solve_4-3.txt

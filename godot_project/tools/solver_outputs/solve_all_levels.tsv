@@ -37,3 +37,9 @@ code	title	zone	resources	slots	allowed	solution_count	status	solution_index	sol
 3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	8	AR | ML | AL | S2 | S2 | MU | AU | R2(IMA-R) | S2 | S2 | R2(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
 3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	9	ML | AL | S1 | S1 | MU | AU | S2 | S2 | R1(IMA-R) | AD | S1 | R2(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
 3-7	Weave	3	2M/3A	2	IMA,LAA	10	ok	10	AR | S2 | ML | AL | S1 | S1 | MU | AU | R1(IMA-R) | S1 | S1 | R1(IMA-U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_3-7.txt
+4-1	Sidestep Strike	4	1M/1A	1	LMA	2	ok	1	MU | AL | S1 | S1 | R1(LMA-U/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-1.txt
+4-1	Sidestep Strike	4	1M/1A	1	LMA	2	ok	2	MU | AL | S1 | S1 | R1(LMA-L/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-1.txt
+4-2	Turn Pursuit	4	1M/1A	1	LMA	2	ok	1	MU | AL | S1 | S1 | R1(LMA-U/R)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-2.txt
+4-2	Turn Pursuit	4	1M/1A	1	LMA	2	ok	2	MU | AL | S1 | S1 | R1(LMA-R/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-2.txt
+4-3	Corner Pursuit	4	1M/1A	1	LMA	2	ok	1	AR | MU | S1 | R1(LMA-U/L)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-3.txt
+4-3	Corner Pursuit	4	1M/1A	1	LMA	2	ok	2	AR | MU | S1 | R1(LMA-L/U)	D:\DIR_02\godot_project\tools\solver_outputs\solve_4-3.txt
