@@ -1,6 +1,5 @@
 4-10 Miss
 resources: 2M / 2A, slots: 2, recovery: False
-search: max_steps=16, solution_limit=10
-solutions found: 2
-1. MU | AL | S1 | S1 | MR | R1(LMA-U/R) | AU | S1 | S1 | R1(LMA-U/R)
-2. MU | AL | S1 | S1 | MR | R1(LMA-U/R) | AU | S1 | S1 | R1(LMA-R/U)
+search: max_steps=24, solution_limit=3
+solutions found: 1
+1. MU | AL | S1 | S1 | MR | R1(LMA-U/L) | AU | S1 | S1 | R1(LMA-R/U)

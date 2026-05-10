@@ -1,5 +1,5 @@
 3-1 Jump
 resources: 2M / 2A, slots: 2, recovery: False
-search: max_steps=14, solution_limit=10
+search: max_steps=24, solution_limit=3
 solutions found: 1
 1. AU | AR | MU | S1 | MR | S2 | R1(IMA-U) | R2(IMA-R)

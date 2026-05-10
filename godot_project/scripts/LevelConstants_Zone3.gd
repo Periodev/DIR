@@ -141,6 +141,25 @@ E.@E
 		#MAMASRASR, MASMARASR, AMASMASRR
 	},
 
+	{
+		"zone": 3,
+		"index": 8,
+		"code": "3-8",
+		"title": "Cross",
+		"object_map": """
+E...
+E...
+...E
+EE.@
+""",
+		"direction_map": "",
+		"move_limit": 2,
+		"attack_limit": 3,
+		"unlocked_slot_count": 2,
+		"kill_recovery_enabled": false,
+		"allowed_skill_types": ["LAA", "IMA"],
+	},
+
 
 ]
 

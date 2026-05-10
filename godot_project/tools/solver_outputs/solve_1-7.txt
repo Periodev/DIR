@@ -1,6 +1,6 @@
 1-7 Corner
 resources: 2M / 2A, slots: 1, recovery: False
-search: max_steps=14, solution_limit=10
+search: max_steps=24, solution_limit=3
 solutions found: 2
-1. AL | ML | AU | MU | R1(LAA-U/R)
-2. MU | AL | ML | AU | S1 | R1(LAA-R/D)
+1. MU | AL | ML | AU | R1(LAA-R/D)
+2. AL | ML | AU | MU | R1(LAA-U/R)

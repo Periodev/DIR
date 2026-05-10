@@ -1,0 +1,7 @@
+5-2 Topdown
+resources: 3M / 3A, slots: 2, recovery: False
+search: max_steps=24, solution_limit=3
+solutions found: 3
+1. ML | AD | ML | AD | AL | MD | S1 | R1(IMA-D) | R2(LAA-U/R)
+2. ML | ML | AD | AL | S2 | S2 | MD | AR | R2(IMA-D) | R1(LAA-U/R)
+3. ML | ML | AD | AL | S2 | S1 | R1(LMA-D/R) | MD | S2 | AD | R2(LMA-R/D)

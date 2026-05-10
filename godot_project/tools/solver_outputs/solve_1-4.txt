@@ -1,5 +1,5 @@
 1-4 Buffer
 resources: 1M / 2A, slots: 1, recovery: False
-search: max_steps=14, solution_limit=10
+search: max_steps=24, solution_limit=3
 solutions found: 1
-1. AU | ML | AL | S1 | R1(LAA-U/R)
+1. AU | ML | AL | R1(LAA-U/R)

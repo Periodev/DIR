@@ -1,5 +1,5 @@
 3-3 Cut in
 resources: 1M / 3A, slots: 2, recovery: False
-search: max_steps=14, solution_limit=10
+search: max_steps=24, solution_limit=3
 solutions found: 1
-1. AR | MR | AR | AD | S1 | S2 | R2(IMA-D) | R1(LAA-D/L)
+1. AR | MR | AR | S1 | AD | R1(IMA-D) | R2(LAA-D/L)

@@ -1,6 +1,5 @@
 4-3 Corner Pursuit
 resources: 1M / 1A, slots: 2, recovery: False
-search: max_steps=14, solution_limit=10
-solutions found: 2
-1. AR | MU | S1 | R1(LMA-U/L)
-2. AR | MU | S1 | R1(LMA-L/U)
+search: max_steps=24, solution_limit=3
+solutions found: 1
+1. AR | MU | S1 | R1(LMA-L/U)

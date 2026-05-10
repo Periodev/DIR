@@ -1,0 +1,242 @@
+generated candidates: 30
+
+#1 2M/3A slots=2 allowed=IMA,LAA,LMA
+..EE
+..E.
+.E.@
+...E
+first: AD | MU | AU | AL | ML | S1 | R2(LAA-U/R) | R1(LMA-L/D)
+solutions: AD | MU | AU | AL | ML | S1 | R2(LAA-U/R) | R1(LMA-L/D) || AD | ML | AU | S1 | AL | MU | R2(LAA-U/R) | R1(LMA-R/U) || AD | MU | AU | AL | S1 | ML | S2 | R1(LAA-U/R) | R2(LMA-D/L) || AD | ML | AU | AL | S1 | MU | S2 | R2(IMA-U) | R1(LAA-U/R) || AD | ML | AU | AL | S1 | S2 | MU | R1(LAA-U/R) | R2(LMA-U/R)
+
+#2 2M/3A slots=2 allowed=IMA,LAA,LMA
+EE..
+.E..
+E..E
+.@..
+first: MU | AU | S1 | S1 | MR | AR | S2 | S2 | R1(IMA-L) | R2(IMA-U) | AR
+solutions: MU | AU | S1 | S1 | MR | AR | S2 | S2 | R1(IMA-L) | R2(IMA-U) | AR
+
+#3 2M/3A slots=2 allowed=IMA,LAA,LMA
+@E.E
+....
+..E.
+..EE
+first: AR | MR | S1 | MR | AR | S2 | S2 | R1(IMA-D) | R2(IMA-D) | AR
+solutions: AR | MR | S1 | MR | AR | S2 | S2 | R1(IMA-D) | R2(IMA-D) | AR || AR | MR | S1 | MR | AR | R1(IMA-D) | AD | S2 | S2 | R2(LMA-R/D) || AR | MR | S1 | MR | AR | S2 | R1(IMA-D) | AD | S1 | S1 | R1(LMA-R/D)
+
+#4 2M/3A slots=2 allowed=IMA,LAA,LMA
+..EE
+....
+.E.E
+.@.E
+first: AU | MR | AR | S2 | S2 | MU | AR | S1 | R2(IMA-U) | R1(LAA-U/R)
+solutions: AU | MR | AR | S2 | S2 | MU | AR | S1 | R2(IMA-U) | R1(LAA-U/R) || AU | MR | AR | S2 | S2 | MU | S1 | AR | R1(IMA-U) | R2(IMA-R) || AU | MR | AR | S2 | S2 | MU | S1 | R1(IMA-R) | R2(IMA-U) | AL || AU | MR | AR | S2 | S2 | MU | AR | R2(IMA-U) | S2 | S1 | R1(IMA-R) || AU | MR | AR | S2 | S2 | MU | S1 | AR | R1(IMA-U) | S1 | R2(IMA-R)
+
+#5 2M/3A slots=2 allowed=IMA,LAA,LMA
+.EE.
+....
+E...
+.EE@
+first: AL | MU | S1 | ML | R1(LMA-L/D) | AL | S1 | S1 | R1(IMA-U) | AR
+solutions: AL | MU | S1 | ML | R1(LMA-L/D) | AL | S1 | S1 | R1(IMA-U) | AR
+
+#6 2M/3A slots=2 allowed=IMA,LAA,LMA
+..E.
+....
+.EE@
+..EE
+first: AD | AL | S1 | ML | R1(LAA-D/L) | MU | AU
+solutions: AD | AL | S1 | ML | R1(LAA-D/L) | MU | AU || AD | AL | ML | AD | S1 | MU | R2(LAA-U/R) | R1(LMA-L/D) || AD | AL | ML | AL | S1 | S2 | R1(LAA-R/D) | R2(IMA-U) || AD | AL | ML | AL | S2 | MU | R1(LAA-U/R) | R2(IMA-D) || AD | MD | S1 | AL | ML | S2 | R1(IMA-U) | AL | R2(IMA-U)
+
+#7 2M/3A slots=2 allowed=IMA,LAA,LMA
+EE..
+...@
+.E.E
+.E..
+first: AD | ML | S1 | R1(LMA-U/L) | ML | AL | S1 | S1 | R1(IMA-D) | AD
+solutions: AD | ML | S1 | R1(LMA-U/L) | ML | AL | S1 | S1 | R1(IMA-D) | AD || AD | ML | S1 | R1(LMA-L/D) | MD | AD | S1 | S1 | R1(IMA-U) | AL
+
+#8 2M/3A slots=2 allowed=IMA,LAA,LMA
+@E..
+....
+.EE.
+.E.E
+first: AR | MR | S1 | R1(IMA-D) | AR | AD | MR | S2 | R2(LMA-R/D)
+solutions: AR | MR | S1 | R1(IMA-D) | AR | AD | MR | S2 | R2(LMA-R/D) || AR | MR | S1 | R1(IMA-D) | AR | AD | MD | S2 | R2(IMA-R) || AR | MR | S1 | R1(IMA-D) | AD | AR | MR | S1 | R1(LMA-R/D) || AR | MR | S1 | R1(IMA-D) | AD | AR | MD | S1 | R1(IMA-R)
+
+#9 2M/3A slots=2 allowed=IMA,LAA,LMA
+EE..
+E..E
+@.E.
+....
+first: AU | MU | AU | S1 | MR | AU | S2 | R1(IMA-R) | R2(LMA-L/D)
+solutions: AU | MU | AU | S1 | MR | AU | S2 | R1(IMA-R) | R2(LMA-L/D) || AU | MU | AU | S1 | MR | AU | S2 | R1(IMA-R) | S1 | R2(LMA-L/D) || AU | MU | AU | S1 | MR | AU | R1(IMA-R) | S1 | S1 | R1(LMA-L/D) || AU | MR | AR | S2 | S2 | R2(IMA-U) | AL | MR | S1 | R1(LMA-D/R) || AU | S2 | MR | AR | S1 | S1 | R1(IMA-U) | AL | MR | S2 | R2(LMA-D/R)
+
+#10 2M/3A slots=2 allowed=IMA,LAA,LMA
+....
+.E@E
+...E
+E..E
+first: AR | AL | MR | S1 | AD | R1(IMA-D) | ML | S2 | R2(IMA-L)
+solutions: AR | AL | MR | S1 | AD | R1(IMA-D) | ML | S2 | R2(IMA-L) || AR | AL | MD | AR | S1 | R1(LMA-D/R) | ML | S2 | R2(IMA-L) || AL | AR | MR | S2 | AD | R2(IMA-D) | ML | S1 | R1(IMA-L) || AL | AR | MD | AR | S2 | R2(LMA-D/R) | ML | S1 | R1(IMA-L) || AR | MD | AR | S1 | R1(LMA-D/R) | ML | AL | S2 | S2 | R2(IMA-U)
+
+#11 2M/3A slots=2 allowed=IMA,LAA,LMA
+E...
+@.E.
+..EE
+E...
+first: AU | MD | AD | MR | AR | S1 | S2 | R2(LMA-R/D) | R1(LAA-U/R)
+solutions: AU | MD | AD | MR | AR | S1 | S2 | R2(LMA-R/D) | R1(LAA-U/R) || AU | MD | AD | S2 | S2 | R2(IMA-R) | AR | S1 | R1(LAA-U/R) || AU | MD | AD | S2 | S2 | MU | S1 | R1(IMA-R) | R2(IMA-D) | AR || AU | MD | AD | S2 | S2 | MR | S1 | AR | R1(LMA-R/U) | R2(IMA-R) || AU | MD | AD | S2 | S2 | MR | S1 | AR | R2(IMA-R) | R1(LMA-U/L)
+
+#12 2M/3A slots=2 allowed=IMA,LAA,LMA
+EE..
+E...
+.@.E
+..E.
+first: MR | AR | AD | S2 | S1 | ML | S2 | R1(IMA-U) | AL | R2(LMA-L/D)
+solutions: MR | AR | AD | S2 | S1 | ML | S2 | R1(IMA-U) | AL | R2(LMA-L/D) || MR | AR | AD | S2 | S1 | ML | S2 | R2(LMA-U/L) | R1(IMA-U) | AL || MR | AR | AD | S2 | S2 | MU | S1 | R1(LMA-L/U) | AL | R2(LMA-L/U) || MR | AR | AD | S2 | S1 | ML | S2 | R1(IMA-U) | AL | S1 | R2(LMA-L/D) || MR | AR | AD | S2 | S2 | MU | S1 | R1(LMA-L/U) | AL | S1 | R2(LMA-L/U)
+
+#13 2M/3A slots=2 allowed=IMA,LAA,LMA
+E.E.
+.E..
+.E.E
+..@.
+first: MU | AR | AL | S1 | ML | S2 | R2(IMA-U) | R1(LMA-U/R) | AL
+solutions: MU | AR | AL | S1 | ML | S2 | R2(IMA-U) | R1(LMA-U/R) | AL || MU | AR | AL | S1 | R1(LMA-L/U) | MU | S1 | R1(LMA-U/L) | AR || MU | AL | AR | S1 | R1(LMA-U/L) | AU | MU | S2 | R2(IMA-L) || MU | AL | AR | S1 | R1(LMA-U/L) | AU | ML | S2 | R2(LMA-L/U) || MU | AL | AR | S1 | S2 | R1(LMA-U/L) | AU | MU | S1 | R1(IMA-L)
+
+#14 2M/3A slots=2 allowed=IMA,LAA,LMA
+....
+E..E
+@.EE
+.E..
+first: AU | MR | AR | AD | MU | S1 | R1(IMA-R) | R2(LAA-R/D)
+solutions: AU | MR | AR | AD | MU | S1 | R1(IMA-R) | R2(LAA-R/D) || AU | MR | AR | AD | MR | S1 | R2(LAA-U/R) | R1(LMA-R/U) || AU | MR | AR | AD | S1 | MR | R2(LAA-U/R) | R1(LMA-R/U) || AU | MR | AR | S1 | AD | MR | S2 | R1(LAA-U/R) | R2(LMA-U/R) || AU | MR | AD | AR | S1 | S2 | MR | R1(LAA-U/R) | R2(LMA-U/R)
+
+#15 2M/3A slots=2 allowed=IMA,LAA,LMA
+.E..
+@.E.
+..EE
+...E
+first: MR | AU | AR | S2 | S1 | MR | S2 | R2(IMA-D) | AR | R1(LMA-D/R)
+solutions: MR | AU | AR | S2 | S1 | MR | S2 | R2(IMA-D) | AR | R1(LMA-D/R) || MR | AU | AR | S2 | S1 | R1(LMA-D/R) | MR | S2 | R2(IMA-R) | AD || MR | AU | AR | S2 | S2 | MD | AR | S1 | R2(IMA-R) | R1(LAA-R/D) || MR | AU | AR | S2 | S1 | MR | AD | R1(LMA-D/R) | S1 | S1 | R1(LMA-R/D) || MR | AU | AR | S2 | S1 | MR | S2 | R2(IMA-D) | AR | S2 | R1(LMA-D/R)
+
+#16 2M/3A slots=2 allowed=IMA,LAA,LMA
+E...
+E...
+...E
+EE.@
+first: AU | ML | AL | S2 | S2 | R2(IMA-L) | MU | AU | S1 | R1(IMA-U)
+solutions: AU | ML | AL | S2 | S2 | R2(IMA-L) | MU | AU | S1 | R1(IMA-U) || AU | ML | AL | S2 | S2 | R2(IMA-L) | MU | S1 | R1(IMA-U) | AU || AU | ML | AL | S2 | S2 | R2(IMA-L) | MU | AU | S1 | S2 | R1(IMA-U) || AU | ML | AL | S2 | S2 | R2(IMA-L) | MU | AU | S2 | S2 | R2(IMA-U)
+
+#17 2M/3A slots=2 allowed=IMA,LAA,LMA
+...E
+..E.
+E..E
+@.E.
+first: AU | MR | S1 | AR | MR | S2 | R2(IMA-U) | R1(LMA-R/U) | AD
+solutions: AU | MR | S1 | AR | MR | S2 | R2(IMA-U) | R1(LMA-R/U) | AD || MR | AR | S1 | S1 | MU | AL | S2 | S2 | R1(IMA-R) | R2(LMA-U/L) | AU
+
+#18 2M/3A slots=2 allowed=IMA,LAA,LMA
+..E.
+...E
+E...
+@.EE
+first: AU | MR | AR | MR | AR | S1 | S2 | R2(IMA-U) | R1(LAA-U/R)
+solutions: AU | MR | AR | MR | AR | S1 | S2 | R2(IMA-U) | R1(LAA-U/R) || AU | MR | AR | S2 | S2 | MR | AR | S1 | R2(IMA-U) | R1(LAA-U/R)
+
+#19 2M/3A slots=2 allowed=IMA,LAA,LMA
+.EE.
+.@..
+E...
+EE..
+first: AU | MU | S1 | AR | MD | S2 | R1(IMA-D) | AL | R2(LMA-U/L)
+solutions: AU | MU | S1 | AR | MD | S2 | R1(IMA-D) | AL | R2(LMA-U/L) || AU | MU | S1 | AR | MD | S2 | R2(LMA-L/D) | R1(IMA-D) | AR || AU | MR | AU | S1 | ML | S2 | R2(LMA-D/L) | AD | R1(LMA-L/D) || AU | MU | S1 | AR | MD | S2 | R1(IMA-D) | AL | S1 | R2(LMA-U/L) || AU | MU | S1 | AR | MD | R1(IMA-D) | AL | S1 | S1 | R1(LMA-L/U)
+
+#20 2M/3A slots=2 allowed=IMA,LAA,LMA
+.E..
+E..E
+E.E.
+.@..
+first: MU | AL | MU | AU | AL | S1 | S2 | R1(LMA-R/U) | R2(LAA-R/D)
+solutions: MU | AL | MU | AU | AL | S1 | S2 | R1(LMA-R/U) | R2(LAA-R/D) || MU | AL | AR | S1 | R1(LMA-U/L) | AU | MR | S1 | R1(IMA-R) || MU | AL | AR | S1 | R1(LMA-U/L) | AU | S1 | MR | R1(LAA-U/R) || MU | AL | AR | S1 | S2 | R1(LMA-U/L) | AU | MR | S2 | R2(IMA-R) || MU | AL | S1 | S1 | MU | AU | AL | S2 | R1(LMA-R/U) | R2(LAA-R/D)
+
+#21 2M/3A slots=2 allowed=IMA,LAA,LMA
+...E
+EE..
+@E.E
+....
+first: AU | MU | S1 | R1(IMA-R) | AD | MR | S1 | R1(LMA-R/D) | AU
+solutions: AU | MU | S1 | R1(IMA-R) | AD | MR | S1 | R1(LMA-R/D) | AU || AU | AR | MR | S2 | AU | R2(IMA-R) | MU | S1 | R1(IMA-U) || AU | AR | MR | S2 | AU | R2(IMA-R) | MU | S2 | R2(IMA-U) || AU | AR | MR | S2 | R2(IMA-U) | MR | S1 | R1(LMA-R/U) | AD || AU | AR | MR | S2 | R2(IMA-R) | MU | AU | S1 | R1(IMA-L)
+
+#22 2M/3A slots=2 allowed=IMA,LAA,LMA
+.E.E
+..EE
+..E@
+....
+first: AU | MU | AU | AL | ML | S1 | R2(LAA-R/D) | R1(LMA-L/U)
+solutions: AU | MU | AU | AL | ML | S1 | R2(LAA-R/D) | R1(LMA-L/U) || AU | AL | MU | AL | S2 | ML | R2(LMA-U/L) | R1(LAA-U/R) || AU | AL | ML | AU | S1 | MU | R1(LMA-U/R) | R2(LAA-U/L) || AU | MU | AU | S1 | R1(IMA-L) | MU | S1 | AL | R1(IMA-D) || AU | MU | AU | S1 | R1(IMA-L) | ML | AU | S1 | R1(LMA-R/D)
+
+#23 2M/3A slots=2 allowed=IMA,LAA,LMA
+.EE.
+...E
+E..@
+..E.
+first: AU | ML | S1 | ML | AL | S2 | S2 | R1(LMA-R/D) | R2(IMA-U) | AL
+solutions: AU | ML | S1 | ML | AL | S2 | S2 | R1(LMA-R/D) | R2(IMA-U) | AL || ML | AD | S1 | S1 | MU | AR | S2 | S2 | AU | R2(LMA-L/U) | R1(LMA-L/D) || ML | AD | S1 | S1 | MU | AR | S2 | S2 | AU | R2(LMA-L/U) | S2 | R1(LMA-L/D) || ML | AD | S2 | S2 | MU | AR | S1 | S1 | AU | R1(LMA-L/U) | S1 | R2(LMA-L/D)
+
+#24 2M/3A slots=2 allowed=IMA,LAA,LMA
+..E.
+EE@.
+.E.E
+....
+first: AU | MD | AR | AL | S2 | ML | R1(LAA-U/R) | R2(LMA-U/L)
+solutions: AU | MD | AR | AL | S2 | ML | R1(LAA-U/R) | R2(LMA-U/L) || AU | MD | AL | AR | ML | S2 | R2(IMA-U) | R1(LAA-U/L) || AU | MD | AL | AR | S2 | ML | R1(LAA-U/R) | R2(LMA-L/U) || AU | AL | MD | AR | S2 | MU | R2(LMA-L/U) | R1(LAA-D/L) || MD | AR | AL | S1 | ML | S2 | R2(IMA-U) | AL | R1(LMA-R/U)
+
+#25 2M/3A slots=2 allowed=IMA,LAA,LMA
+E...
+.E.E
+@.E.
+...E
+first: MU | AU | AR | S2 | S1 | MD | S2 | R1(IMA-R) | R2(LMA-R/U) | AD
+solutions: MU | AU | AR | S2 | S1 | MD | S2 | R1(IMA-R) | R2(LMA-R/U) | AD
+
+#26 2M/3A slots=2 allowed=IMA,LAA,LMA
+...E
+....
+E..E
+@.EE
+first: AU | MR | AR | S2 | S2 | MU | S1 | R1(IMA-R) | AD | R2(IMA-U)
+solutions: AU | MR | AR | S2 | S2 | MU | S1 | R1(IMA-R) | AD | R2(IMA-U) || AU | MR | AR | S2 | S2 | R2(IMA-R) | AU | MU | S1 | R1(IMA-U) || AU | MR | AR | S2 | S2 | R2(IMA-R) | AU | MU | S2 | R2(IMA-U) || AU | MR | AR | S2 | S2 | MU | S1 | R1(IMA-R) | AD | S1 | R2(IMA-U) || AU | MR | AR | S2 | S2 | MU | S1 | R2(IMA-R) | AD | S2 | R1(IMA-U)
+
+#27 2M/3A slots=2 allowed=IMA,LAA,LMA
+.EE.
+E.@.
+E...
+..E.
+first: AU | ML | AU | S1 | AL | MD | R2(LAA-U/L) | R1(LMA-R/D)
+solutions: AU | ML | AU | S1 | AL | MD | R2(LAA-U/L) | R1(LMA-R/D) || AU | MD | AD | ML | AL | S1 | S2 | R2(LMA-U/L) | R1(LAA-U/R) || AU | ML | AU | AL | S1 | S2 | R2(LMA-D/L) | MR | R1(LAA-R/D) || AU | ML | AU | AL | S1 | S2 | R2(LMA-D/L) | MD | R1(LAA-U/R) || AU | MD | AD | S2 | S2 | ML | S1 | AL | R2(IMA-U) | R1(LMA-D/L)
+
+#28 2M/3A slots=2 allowed=IMA,LAA,LMA
+....
+@.E.
+.E.E
+.E.E
+first: MR | AR | AD | MD | AD | S1 | S2 | R2(IMA-R) | R1(LAA-R/D)
+solutions: MR | AR | AD | MD | AD | S1 | S2 | R2(IMA-R) | R1(LAA-R/D) || MR | AR | AD | S2 | S1 | MD | AD | S2 | R1(IMA-R) | R2(IMA-D) || MR | AR | AD | S2 | S1 | MD | S2 | R1(IMA-D) | R2(IMA-R) | AU || MR | AR | AD | S2 | S1 | R1(IMA-D) | MR | S2 | AR | R2(LMA-U/R) || MR | AR | S1 | S1 | R1(IMA-D) | AD | MR | S1 | AR | R1(LMA-R/D)
+
+#29 2M/3A slots=2 allowed=IMA,LAA,LMA
+E...
+@EE.
+...E
+..E.
+first: AU | AR | MR | AR | MD | S2 | R2(LMA-R/U) | R1(LAA-R/D)
+solutions: AU | AR | MR | AR | MD | S2 | R2(LMA-R/U) | R1(LAA-R/D) || AU | AR | MU | S1 | MD | S2 | R1(IMA-R) | R2(LMA-D/R) | AD || AU | AR | MR | S1 | MD | R1(LMA-R/U) | AD | S2 | R2(LAA-U/R) || AU | AR | MR | S1 | AR | MR | S2 | R1(LMA-D/R) | R2(IMA-D) || AU | AR | MR | S1 | AR | MR | S2 | R2(IMA-D) | R1(LMA-R/U)
+
+#30 2M/3A slots=2 allowed=IMA,LAA,LMA
+....
+..E.
+@.EE
+E.E.
+first: AD | MR | AR | MR | AU | S2 | R2(LAA-R/D)
+solutions: AD | MR | AR | MR | AU | S2 | R2(LAA-R/D) || AD | MR | AR | S1 | MR | AU | R1(LAA-R/D) || AD | MR | AR | S1 | MR | AD | R1(LAA-U/R) || AD | MR | AR | MR | AU | S1 | S2 | R2(LAA-R/D) || AD | MR | AR | S1 | MR | AU | S2 | R1(LAA-R/D)
+

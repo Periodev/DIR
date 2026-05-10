@@ -1,0 +1,5 @@
+5-9 Loaded
+resources: 2M / 3A, slots: 2, recovery: False
+search: max_steps=24, solution_limit=3
+solutions found: 1
+1. AD | MR | AD | S1 | MU | AR | R2(LAA-U/L) | R1(LMA-U/R)

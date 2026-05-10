@@ -1,6 +1,5 @@
 4-9 Zig
 resources: 2M / 2A, slots: 2, recovery: False
-search: max_steps=16, solution_limit=10
-solutions found: 2
-1. MU | AL | S1 | S1 | R1(LMA-L/U) | AL | ML | S1 | R1(IMA-U)
-2. MU | AL | S1 | S1 | ML | AU | S2 | S2 | R1(LMA-U/L) | R2(LMA-D/L)
+search: max_steps=24, solution_limit=3
+solutions found: 1
+1. MU | AL | S1 | S1 | ML | AU | R1(LMA-U/L) | S2 | R2(LMA-D/L)

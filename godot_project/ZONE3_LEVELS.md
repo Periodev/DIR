@@ -144,3 +144,26 @@ E.@E
 
 Target pattern:
 - Mixed two-slot sequencing.
+
+## 3-8 Cross
+
+Goal:
+- Add a harder board-read puzzle that still stays inside the Zone 3 skill set.
+- This was moved from the Zone 5 candidate pool because it solves with
+  `LAA / IMA` only and does not need `LMA`.
+- It is not primarily a dual-slot interaction lesson: the main route can be
+  read as an `IMA` chain, but finding that route is non-trivial.
+
+Resources:
+- `2M / 3A`
+
+Map:
+```text
+E...
+E...
+...E
+EE.@
+```
+
+Target pattern:
+- Harder `IMA` route reading, not a new two-slot grammar.

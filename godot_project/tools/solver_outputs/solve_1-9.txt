@@ -1,6 +1,6 @@
 1-9 Sequence
 resources: 2M / 3A, slots: 1, recovery: False
-search: max_steps=14, solution_limit=10
+search: max_steps=24, solution_limit=3
 solutions found: 2
 1. AU | MD | AR | AL | MR | R1(LAA-U/R)
 2. AU | MD | AL | AR | MR | R1(LAA-U/R)

@@ -1,0 +1,5 @@
+5-8 Bottom Up
+resources: 2M / 3A, slots: 2, recovery: False
+search: max_steps=24, solution_limit=3
+solutions found: 1
+1. AL | MU | S1 | ML | R1(LMA-L/D) | AL | S1 | S1 | R1(IMA-U) | AR

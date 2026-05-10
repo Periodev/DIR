@@ -1,8 +1,6 @@
 4-8 Spiral
 resources: 2M / 2A, slots: 2, recovery: False
-search: max_steps=16, solution_limit=10
-solutions found: 4
-1. AD | MU | AR | S2 | S2 | ML | S1 | R1(LMA-L/D) | R2(LMA-U/R)
-2. AD | MU | AR | S2 | S2 | ML | S1 | R1(LMA-L/D) | R2(LMA-R/U)
-3. MU | AR | S1 | S1 | ML | AU | S2 | S2 | R1(LMA-D/L) | R2(LMA-R/D)
-4. MU | AR | S1 | S1 | ML | AU | S2 | S2 | R1(LMA-D/L) | R2(LMA-D/R)
+search: max_steps=24, solution_limit=3
+solutions found: 2
+1. MU | AR | S1 | S1 | ML | AU | R1(LMA-D/L) | S2 | R2(LMA-R/D)
+2. AD | MU | AR | S2 | S2 | ML | S1 | R1(LMA-L/D) | R2(LMA-U/R)

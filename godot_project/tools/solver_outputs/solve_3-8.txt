@@ -1,0 +1,7 @@
+3-8 Cross
+resources: 2M / 3A, slots: 2, recovery: False
+search: max_steps=24, solution_limit=3
+solutions found: 3
+1. AU | ML | AL | S2 | S2 | R2(IMA-L) | MU | AU | S1 | R1(IMA-U)
+2. AU | ML | AL | S2 | S2 | R2(IMA-L) | MU | S1 | R1(IMA-U) | AU
+3. AU | ML | AL | S2 | S2 | R2(IMA-L) | MU | AU | S2 | S2 | R2(IMA-U)

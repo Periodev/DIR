@@ -1,0 +1,7 @@
+5-5 Stair
+resources: 2M / 3A, slots: 2, recovery: False
+search: max_steps=24, solution_limit=3
+solutions found: 3
+1. AL | MU | AL | S1 | ML | S2 | AU | R2(IMA-L) | R1(LMA-U/L)
+2. AL | MU | AL | S1 | ML | S2 | R2(IMA-U) | R1(LMA-L/D) | AL
+3. AL | MU | AL | S1 | ML | S2 | R2(IMA-L) | R1(LMA-U/L) | AR

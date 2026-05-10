@@ -1,0 +1,7 @@
+5-1 Mixed
+resources: 3M / 3A, slots: 2, recovery: False
+search: max_steps=24, solution_limit=3
+solutions found: 3
+1. AR | MU | AU | MU | AR | S1 | ML | R1(LMA-L/U) | R2(LAA-R/D)
+2. AR | MU | S1 | AU | R1(LMA-U/R) | ML | S2 | R2(LMA-L/U) | AD
+3. AR | MU | S1 | AU | MU | S2 | AR | ML | R1(LMA-L/U) | R2(IMA-D)

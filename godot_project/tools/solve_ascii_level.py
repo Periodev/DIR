@@ -304,16 +304,18 @@ def skill_type_allowed(level: Level, skill_type: str) -> bool:
     return skill_type in level.allowed_skill_types
 
 
-def release_variants(skill_type: str) -> list[tuple[str, ...]]:
+def release_variants(skill_type: str, slot: tuple[tuple[str, str], ...]) -> list[tuple[str, ...]]:
     if skill_type in ("IMA", "IAA"):
         return [(direction,) for direction in DIRS]
-    if skill_type in ("LAA", "LMA"):
+    if skill_type == "LAA":
         return [
             (first, second)
             for first in DIRS
             for second in DIRS
             if first != second and is_orthogonal(first, second)
         ]
+    if skill_type == "LMA":
+        return lma_release_variants(slot)
     return []
 
 
@@ -321,6 +323,25 @@ def is_orthogonal(first: str, second: str) -> bool:
     dx0, dy0 = DIR_VECTOR[first]
     dx1, dy1 = DIR_VECTOR[second]
     return dx0 * dx1 + dy0 * dy1 == 0
+
+
+def lma_release_variants(slot: tuple[tuple[str, str], ...]) -> list[tuple[str, str]]:
+    attack_token, move_token = slot
+    original_attack = attack_token[1]
+    original_move = move_token[1]
+    move_dx, move_dy = DIR_VECTOR[original_move]
+    attack_dx, attack_dy = DIR_VECTOR[original_attack]
+    is_left_ma = (attack_dx, attack_dy) == (move_dy, -move_dx)
+
+    variants: list[tuple[str, str]] = []
+    for move_dir in DIRS:
+        dx, dy = DIR_VECTOR[move_dir]
+        attack_vector = (dy, -dx) if is_left_ma else (-dy, dx)
+        for attack_dir, vector in DIR_VECTOR.items():
+            if vector == attack_vector:
+                variants.append((move_dir, attack_dir))
+                break
+    return variants
 
 
 def solve_level(level: Level, max_steps: int, solution_limit: int) -> list[list[str]]:
@@ -372,14 +393,17 @@ def successors(level: Level, state: State) -> list[tuple[State, str]]:
         if stored is not None:
             result.append((stored, f"S{slot_index + 1}"))
 
-    for slot_index, slot in enumerate(state.slots):
+    # Runtime rotation auto-stores pending EXE vectors before release. Model
+    # releases from action_base so pending attacks can be committed before a
+    # cast. Pending moves still require an explicit store into a partial slot.
+    for slot_index, slot in enumerate(action_base.slots):
         if len(slot) != 2:
             continue
         skill_type = classify_slot(slot)
         if not skill_type_allowed(level, skill_type):
             continue
-        for orientation in release_variants(skill_type):
-            released = try_release(level, state, slot_index, skill_type, orientation)
+        for orientation in release_variants(skill_type, slot):
+            released = try_release(level, action_base, slot_index, skill_type, orientation)
             if released is not None:
                 action = format_release(slot_index, skill_type, orientation)
                 result.append((released, action))

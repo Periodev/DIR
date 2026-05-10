@@ -1,0 +1,7 @@
+5-7 Ridge
+resources: 2M / 3A, slots: 2, recovery: False
+search: max_steps=24, solution_limit=3
+solutions found: 3
+1. AU | MR | AR | MU | AR | S2 | R2(LMA-U/R) | R1(LAA-U/R)
+2. AU | MR | S1 | AR | MU | S2 | R2(LMA-U/R) | AU | R1(LMA-D/R)
+3. AU | MR | S1 | AR | MR | S2 | AU | R2(IMA-U) | R1(LMA-U/L)
